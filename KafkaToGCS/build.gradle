@@ -23,14 +23,9 @@ buildscript {
     }
 }
 
-
-
-apply plugin: 'com.github.johnrengelman.shadow'
-apply plugin: 'java'
-
 jar {
     manifest {
-        attributes('Main-Class': 'com.example.KafkaToBigQuery')
+        attributes('Main-Class': 'com.example.KafkaToGCS')
     }
 }
 
