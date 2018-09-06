@@ -1,0 +1,69 @@
+group 'com.example'
+version '1.0'
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'java'
+
+compileJava.options.compilerArgs.add("-Xlint:unchecked")
+
+repositories {
+    mavenLocal()
+    mavenCentral()
+    maven {
+        url 'http://oss.sonatype.org/content/repositories/snapshots'
+    }
+}
+
+buildscript {
+    repositories {
+        jcenter()
+    }
+    dependencies {
+        classpath 'com.github.jengelman.gradle.plugins:shadow:2.0.2'
+    }
+}
+
+
+
+apply plugin: 'com.github.johnrengelman.shadow'
+apply plugin: 'java'
+
+jar {
+    manifest {
+        attributes('Main-Class': 'com.example.KafkaToBigQuery')
+    }
+}
+
+shadowJar {
+    mergeServiceFiles()
+    zip64 true
+    configurations = [project.configurations.compile]
+}
+
+sourceCompatibility = 1.8
+targetCompatibility = 1.8
+
+assemble.dependsOn shadowJar
+
+dependencies {
+    testCompile group: 'junit', name: 'junit', version: '4.12'
+    testCompile group: 'org.hamcrest', name: 'hamcrest-all', version: '1.3'
+    compile group: 'org.apache.beam', name: 'beam-sdks-java-extensions-google-cloud-platform-core', version: '2.6.0'
+    compile group: 'org.apache.beam', name: 'beam-runners-google-cloud-dataflow-java', version: '2.6.0'
+    compile group: 'org.apache.beam', name: 'beam-runners-direct-java', version: '2.6.0'
+    compile group: 'org.apache.beam', name: 'beam-sdks-java-io-kafka', version: '2.6.0'
+    compile group: 'org.apache.beam', name: 'beam-sdks-java-io-google-cloud-platform', version: '2.6.0'
+    compile group: 'com.google.apis', name: 'google-api-services-clouddebugger', version: 'v2-rev239-1.23.0'
+    // https://mvnrepository.com/artifact/com.google.apis/google-api-services-dataflow
+    compile group: 'com.google.apis', name: 'google-api-services-dataflow', version: 'v1b4-rev7-1.20.0'
+
+
+    // Google Guava
+    compile group: 'com.google.guava', name: 'guava', version:'24.0-jre'
+    compile group: 'org.apache.beam', name: 'beam-runners-direct-java', version: '2.6.0'
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
+    compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
+    compile group: 'org.apache.kafka', name: 'kafka-clients', version: '1.1.0'
+    // https://mvnrepository.com/artifact/org.slf4j/slf4j-log4j12
+    testCompile group: 'org.slf4j', name: 'slf4j-log4j12', version: '1.7.25'
+}
