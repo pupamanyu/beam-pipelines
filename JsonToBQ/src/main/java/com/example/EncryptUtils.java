@@ -30,13 +30,10 @@ import java.security.GeneralSecurityException;
 import java.security.Security;
 
 /**
- * This Utility Class can be used to
- * a) Deterministically Encrypt the Sensitive PII Data and Encode the
- * resultant ByteArray to Base64 Encoded String
- * b) Convert sensitive data values to sha256, and storing the hash mapping
- * in another highly restricted mapping table. If there is no need for extracting
- * the original string value, then just hashing would suffice
- *
+ * This Utility Class can be used to a) Deterministically Encrypt the Sensitive PII Data and Encode
+ * the resultant ByteArray to Base64 Encoded String b) Convert sensitive data values to sha256, and
+ * storing the hash mapping in another highly restricted mapping table. If there is no need for
+ * extracting the original string value, then just hashing would suffice
  */
 public class EncryptUtils {
 

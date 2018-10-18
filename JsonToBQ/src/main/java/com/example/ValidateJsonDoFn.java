@@ -19,10 +19,10 @@
 package com.example;
 
 import com.github.fge.jsonschema.core.exceptions.ProcessingException;
-import javafx.util.Pair;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.TupleTag;
 
 import java.io.IOException;
@@ -30,8 +30,8 @@ import java.io.IOException;
 public class ValidateJsonDoFn extends DoFn<String, String> {
 
   public static final TupleTag<String> VALIDATEDJSON = new TupleTag<String>() {};
-  public static final TupleTag<Pair<String, String>> INVALIDATEDJSON =
-      new TupleTag<Pair<String, String>>() {};
+  public static final TupleTag<KV<String, String>> INVALIDATEDJSON =
+      new TupleTag<KV<String, String>>() {};
   private final String jsonSchema;
   private final Counter validatedJson;
   private final Counter invalidatedJson;
@@ -49,7 +49,7 @@ public class ValidateJsonDoFn extends DoFn<String, String> {
       this.validatedJson.inc();
       context.output(VALIDATEDJSON, context.element());
     } catch (IOException | ProcessingException e) {
-      Pair<String, String> errorData = new Pair<String, String>(context.element(), e.getMessage());
+      KV<String, String> errorData = KV.of(context.element(), e.getMessage());
       this.invalidatedJson.inc();
       context.output(INVALIDATEDJSON, errorData);
     }

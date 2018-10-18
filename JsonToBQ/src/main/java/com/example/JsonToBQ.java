@@ -26,7 +26,6 @@ import com.google.api.services.bigquery.model.TimePartitioning;
 import com.google.common.base.Joiner;
 import com.google.common.base.Splitter;
 import com.google.common.collect.Lists;
-import javafx.util.Pair;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.Compression;
 import org.apache.beam.sdk.io.FileIO;
@@ -39,6 +38,7 @@ import org.apache.beam.sdk.options.PipelineOptionsFactory;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.Flatten;
 import org.apache.beam.sdk.transforms.ParDo;
+import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.PCollection;
 import org.apache.beam.sdk.values.PCollectionList;
 import org.apache.beam.sdk.values.PCollectionTuple;
@@ -186,7 +186,7 @@ public class JsonToBQ {
           tableRowPCollectionList.and(inputTableRows.get(JsonToTableRowDoFn.VALIDTABLEROWS));
 
       /* Filter invalid/mistyped JSON */
-      PCollection<Pair<String, String>> invalidatedJSONCollection =
+      PCollection<KV<String, String>> invalidatedJSONCollection =
           jsonRows.get(ValidateJsonDoFn.INVALIDATEDJSON);
 
       PCollection<TableRow> errorTableRows =

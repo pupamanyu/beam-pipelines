@@ -19,13 +19,13 @@
 package com.example;
 
 import com.google.api.services.bigquery.model.TableRow;
-import javafx.util.Pair;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.options.ValueProvider;
 import org.apache.beam.sdk.transforms.DoFn;
+import org.apache.beam.sdk.values.KV;
 
-public class ErrorDataToTableRowFn extends DoFn<Pair<String, String>, TableRow> {
+public class ErrorDataToTableRowFn extends DoFn<KV<String, String>, TableRow> {
   private final Counter errors;
   private String partitionColumnName;
   private String partitionColumnValue;
