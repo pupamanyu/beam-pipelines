@@ -18,38 +18,36 @@
 
 package com.example;
 
-import com.github.fge.jsonschema.core.exceptions.ProcessingException;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.values.KV;
 import org.apache.beam.sdk.values.TupleTag;
-
-import java.io.IOException;
+import org.everit.json.schema.ValidationException;
 
 public class ValidateJsonDoFn extends DoFn<String, String> {
 
   public static final TupleTag<String> VALIDATEDJSON = new TupleTag<String>() {};
   public static final TupleTag<KV<String, String>> INVALIDATEDJSON =
       new TupleTag<KV<String, String>>() {};
-  private final String jsonSchema;
   private final Counter validatedJson;
   private final Counter invalidatedJson;
+  private final ValidationUtils validationUtils;
 
   public ValidateJsonDoFn(String jsonSchema) {
-    this.jsonSchema = jsonSchema;
     this.validatedJson = Metrics.counter(ValidateJsonDoFn.class, "validated-json-counts");
     this.invalidatedJson = Metrics.counter(ValidateJsonDoFn.class, "invalidated-json-counts");
+    this.validationUtils = new ValidationUtils(jsonSchema);
   }
 
   @ProcessElement
   public void processElement(ProcessContext context) {
     try {
-      ValidationUtils.validate(context.element(), this.jsonSchema);
+      this.validationUtils.validate(context.element());
       this.validatedJson.inc();
       context.output(VALIDATEDJSON, context.element());
-    } catch (IOException | ProcessingException e) {
-      KV<String, String> errorData = KV.of(context.element(), e.getMessage());
+    } catch (ValidationException e) {
+      KV<String, String> errorData = KV.of(context.element(), e.toJSON().toString());
       this.invalidatedJson.inc();
       context.output(INVALIDATEDJSON, errorData);
     }

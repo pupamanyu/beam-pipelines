@@ -18,48 +18,27 @@
 
 package com.example;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.node.ObjectNode;
-import com.github.fge.jackson.JsonLoader;
-import com.github.fge.jsonschema.core.exceptions.ProcessingException;
-import com.github.fge.jsonschema.core.report.ProcessingMessage;
-import com.github.fge.jsonschema.core.report.ProcessingReport;
-import com.github.fge.jsonschema.main.JsonSchema;
-import com.github.fge.jsonschema.main.JsonSchemaFactory;
-
-import java.io.IOException;
+import org.everit.json.schema.Schema;
+import org.everit.json.schema.ValidationException;
+import org.everit.json.schema.loader.SchemaLoader;
+import org.json.JSONObject;
 
 public class ValidationUtils {
-  public static final String JSON_SCHEMA_IDENTIFIER = "http://json-schema.org/draft-04/schema";
-  public static final String JSON_SCHEMA_IDENTIFIER_ELEMENT = "$schema";
 
-  private static void validate(JsonNode jsonNode, JsonSchema jsonSchema)
-      throws ProcessingException {
-    ProcessingReport processingReport = jsonSchema.validate(jsonNode);
-    if (!processingReport.isSuccess()) {
-      for (ProcessingMessage processingMessage : processingReport) {
-        throw new ProcessingException(processingMessage);
-      }
-    }
+  private final String jsonSchema;
+
+  public ValidationUtils(String jsonSchema) {
+    this.jsonSchema = jsonSchema;
   }
 
-  public static void validate(String json, String jsonSchema)
-      throws IOException, ProcessingException {
-    validate(getJson(json), getJsonSchema(jsonSchema));
-  }
-
-  private static JsonNode getJson(String json) throws IOException {
-    return JsonLoader.fromString(json);
-  }
-
-  private static JsonSchema getJsonSchema(String jsonSchema)
-      throws ProcessingException, IOException {
-    JsonNode jsonNode = getJson(jsonSchema);
-    final JsonNode schemaIdentifier = jsonNode.get(JSON_SCHEMA_IDENTIFIER_ELEMENT);
-    if (schemaIdentifier.isNull()) {
-      ((ObjectNode) jsonNode).put(JSON_SCHEMA_IDENTIFIER_ELEMENT, JSON_SCHEMA_IDENTIFIER);
-    }
-    final JsonSchemaFactory factory = JsonSchemaFactory.byDefault();
-    return factory.getJsonSchema(getJson(jsonSchema));
+  public  void validate(String json) throws ValidationException {
+    Schema schema =
+        SchemaLoader.builder()
+            .schemaJson(new JSONObject(this.jsonSchema))
+            .draftV7Support()
+            .build()
+            .load()
+            .build();
+    schema.validate(new JSONObject(json));
   }
 }
