@@ -22,8 +22,10 @@ import org.everit.json.schema.Schema;
 import org.everit.json.schema.ValidationException;
 import org.everit.json.schema.loader.SchemaLoader;
 import org.json.JSONObject;
+import java.io.Serializable;
+import org.json.JSONException;
 
-public class ValidationUtils {
+public class ValidationUtils implements Serializable {
 
   private final String jsonSchema;
 
@@ -32,13 +34,17 @@ public class ValidationUtils {
   }
 
   public  void validate(String json) throws ValidationException {
-    Schema schema =
-        SchemaLoader.builder()
-            .schemaJson(new JSONObject(this.jsonSchema))
-            .draftV7Support()
-            .build()
-            .load()
-            .build();
-    schema.validate(new JSONObject(json));
+    try {
+      Schema schema =
+          SchemaLoader.builder()
+              .schemaJson(new JSONObject(this.jsonSchema))
+              .draftV7Support()
+              .build()
+              .load()
+              .build();
+      schema.validate(new JSONObject(json));
+    } catch (JSONException jsex) {
+      throw new ValidationException("JSON Parsing exception: " + jsex.getMessage());
+    }
   }
 }
