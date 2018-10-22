@@ -136,7 +136,7 @@ public class JsonToBQ {
           inputRows
               .get(ReadableFileToStringDoFn.VALIDROWS)
               .apply(
-                  "Desensitize Data",
+                  "Desensitize Data for: " + prefix,
                   ParDo.of(
                           new DeSensitizeDoFn(
                               options.getSensitiveFields(), options.getGeoRootFieldName()))
