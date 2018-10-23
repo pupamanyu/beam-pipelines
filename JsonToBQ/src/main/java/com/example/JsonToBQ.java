@@ -165,14 +165,13 @@ public class JsonToBQ {
         desensitizedRows =
             extractedCustomRows.get(ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS)
               .apply(
-                "Desensitize Data for: " + prefix,
-                ParDo.of(
-                        new DeSensitizeDoFn(
-                            options.getSensitiveFields(), options.getGeoRootFieldName()))
-                    .withOutputTags(
-                        DeSensitizeDoFn.DESENSITIZED_SUCCESS,
-                        TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
-      }
+                  "Desensitize Data for: " + prefix,
+                  ParDo.of(
+                          new DeSensitizeDoFn(
+                              options.getSensitiveFields(), options.getGeoRootFieldName()))
+                      .withOutputTags(
+                          DeSensitizeDoFn.DESENSITIZED_SUCCESS,
+                          TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
 
       /* Validate the JSON Rows, Handle invalid/mistyped JSON rows separately */
       PCollectionTuple jsonRows =
