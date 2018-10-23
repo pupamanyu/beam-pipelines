@@ -131,18 +131,48 @@ public class JsonToBQ {
                       .withOutputTags(
                           ReadableFileToStringDoFn.VALIDROWS,
                           TupleTagList.of(ReadableFileToStringDoFn.FAILEDFILES)));
-      /* Desensitize the Rows by removing PII */
-      PCollectionTuple desensitizedRows =
-          inputRows
-              .get(ReadableFileToStringDoFn.VALIDROWS)
+
+      final PCollectionTuple desensitizedRows;
+
+      if (options.getCustomDataType().get().trim().isEmpty()) {
+        /* Desensitize the Rows by removing PII */
+        desensitizedRows = inputRows
+          .get(ReadableFileToStringDoFn.VALIDROWS)
+            .apply(
+              "Desensitize Data for: " + prefix,
+              ParDo.of(
+                      new DeSensitizeDoFn(
+                          options.getSensitiveFields(), options.getGeoRootFieldName()))
+                  .withOutputTags(
+                      DeSensitizeDoFn.DESENSITIZED_SUCCESS,
+                      TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));;
+      } else {
+        /* Extract Custom Data Type from Configuration */
+        PCollectionTuple extractedCustomRows =
+            inputRows
+                .get(ReadableFileToStringDoFn.VALIDROWS)
+                .apply(
+                    "Extract Custom Data " + options.getCustomDataType().get() + " for: " + prefix,
+                    ParDo.of(
+                        new ExtractCustomDoFn(
+                            options.getCustomDataType().get(),
+                            options.getFilterCustomFields().get()))
+                        .withOutputTags(
+                            ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS,
+                            TupleTagList.of(ExtractCustomDoFn.EXTRACTCUSTOM_FAILED)));
+
+        /* Desensitize the Rows by removing PII */
+        desensitizedRows =
+            extractedCustomRows.get(ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS)
               .apply(
-                  "Desensitize Data",
-                  ParDo.of(
-                          new DeSensitizeDoFn(
-                              options.getSensitiveFields(), options.getGeoRootFieldName()))
-                      .withOutputTags(
-                          DeSensitizeDoFn.DESENSITIZED_SUCCESS,
-                          TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
+                "Desensitize Data for: " + prefix,
+                ParDo.of(
+                        new DeSensitizeDoFn(
+                            options.getSensitiveFields(), options.getGeoRootFieldName()))
+                    .withOutputTags(
+                        DeSensitizeDoFn.DESENSITIZED_SUCCESS,
+                        TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
+      }
 
       /* Validate the JSON Rows, Handle invalid/mistyped JSON rows separately */
       PCollectionTuple jsonRows =
