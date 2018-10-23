@@ -15,7 +15,7 @@ public class ExtractCustomDoFn extends DoFn<String, String> {
   public static final TupleTag<String> EXTRACTCUSTOM_FAILED = new TupleTag<String>() {};
   private static final List<String> VALID_CUSTOM_TYPES = Splitter.on(',').splitToList(JsonToBQ.options.getValidCustomDataTypes().get());
   private static final String CUSTOMDATATYPE_FIELDSELECTOR = JsonToBQ.options.getCustomDataTypeFieldSelector().get();
-  private static final String CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR = JsonToBQ.options.getCustomDataTypeExcludingFieldSelector().get();
+  private static final String CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE = JsonToBQ.options.getCustomDataTypeExcludingFieldSelectorValue().get();
   private final List<String> filter;
   private final String customDataType;
   private final Counter extractedCustomRows;
@@ -40,7 +40,7 @@ public class ExtractCustomDoFn extends DoFn<String, String> {
   public void processElement(ProcessContext context) {
     JSONObject element = new JSONObject(context.element());
     if (element.has(CUSTOMDATATYPE_FIELDSELECTOR) && element.get(CUSTOMDATATYPE_FIELDSELECTOR) instanceof String) {
-      if (this.customDataType.equals(CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR)
+      if (this.customDataType.equals(CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE)
           && this.filter
               .stream()
               .noneMatch(element.getString(CUSTOMDATATYPE_FIELDSELECTOR)::equals)) {

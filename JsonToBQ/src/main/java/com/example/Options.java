@@ -154,9 +154,9 @@ public interface Options
   void setCustomDataTypeFieldSelector(ValueProvider<String> value);
 
   @Description(
-      "Field used to clasify custom data types when exclusion is in place. This is required for Custom Data only. Default value is not used at all")
+      "Value used to clasify custom data types when exclusion is in place. This is required for Custom Data only. Default value is not used at all")
   @Default.String("")
-  ValueProvider<String> getCustomDataTypeExcludingFieldSelector();
+  ValueProvider<String> getCustomDataTypeExcludingFieldSelectorValue();
 
-  void setCustomDataTypeExcludingFieldSelector(ValueProvider<String> value);
+  void setCustomDataTypeExcludingFieldSelectorValue(ValueProvider<String> value);
 }
