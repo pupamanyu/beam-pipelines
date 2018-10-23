@@ -124,4 +124,39 @@ public interface Options
   ValueProvider<String> getGeoRootFieldName();
 
   void setGeoRootFieldName(ValueProvider<String> value);
+
+  @Description(
+      "Comma Separated List of Custom Fields to Extract. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getFilterCustomFields();
+
+  void setFilterCustomFields(ValueProvider<String> value);
+
+  @Description(
+      "Custom Data Type can be one of valid custom datatypes. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataType();
+
+  void setCustomDataType(ValueProvider<String> value);
+
+  @Description(
+      "List of all possible custom data types. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getValidCustomDataTypes();
+
+  void setValidCustomDataTypes(ValueProvider<String> value);
+
+  @Description(
+      "Field used to clasify custom data types. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataTypeFieldSelector();
+
+  void setCustomDataTypeFieldSelector(ValueProvider<String> value);
+
+  @Description(
+      "Field used to clasify custom data types when exclusion is in place. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataTypeExcludingFieldSelector();
+
+  void setCustomDataTypeExcludingFieldSelector(ValueProvider<String> value);
 }
