@@ -32,6 +32,9 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Iterator;
 
 public class TransformJsonDoFn extends DoFn<String, String> {
 
@@ -47,6 +50,7 @@ public class TransformJsonDoFn extends DoFn<String, String> {
   private ValueProvider<String> dateFormat;
   private String timestampField;
   private String partitionField;
+  private final Boolean sanitizeJson = JsonToBQ.options.getSanitizeJson().get();
 
   public TransformJsonDoFn(
       ValueProvider<String> timestampColumn,
@@ -58,6 +62,36 @@ public class TransformJsonDoFn extends DoFn<String, String> {
     this.partitionColumn = partitionColumn;
     this.dateFormat = dateFormat;
     this.objectMapper = new ObjectMapper();
+  }
+
+  static String sanitizeString(String str) {
+    return str.replace(": ", "_").replace(".", "_").replace(" ", "_");
+  }
+
+  static JsonNode sanitizePropertyNames(JsonNode json) {
+    Map<String, JsonNode> toBeSanitized = new HashMap<>();
+    Map<String, JsonNode> objects = new HashMap<>();
+    Iterator<Map.Entry<String, JsonNode>> iter = json.fields();
+    while (iter.hasNext()) {
+      Map.Entry<String, JsonNode> elt = iter.next();
+      if (elt.getValue().isObject()) {
+        JsonNode sanitized = sanitizePropertyNames(elt.getValue());
+        objects.put(elt.getKey(), sanitized);
+      } else if (!elt.getValue().isArray()){
+        if (elt.getKey().contains(": ") || elt.getKey().contains(".") || elt.getKey().contains(" ")){
+          toBeSanitized.put(elt.getKey(), null);
+        }
+      }
+    }
+    ObjectNode objNode = (ObjectNode) json;
+    for (String key : toBeSanitized.keySet()) {
+      objNode.set(sanitizeString(key), toBeSanitized.get(key) == null ? objNode.get(key) : toBeSanitized.get(key));
+      objNode.remove(key);
+    }
+    for (String key : objects.keySet()) {
+      objNode.set(sanitizeString(key), toBeSanitized.get(key) == null ? objNode.get(key) : toBeSanitized.get(key));
+    }
+    return objNode;
   }
 
   private JsonNode insertTimestampPartition(JsonNode jsonNode) {
@@ -89,6 +123,9 @@ public class TransformJsonDoFn extends DoFn<String, String> {
       JsonNode jsonNode = objectMapper.readTree(context.element());
       // Insert Timestamp Partition Column Field
       jsonNode = insertTimestampPartition(jsonNode);
+      if (sanitizeJson) {
+        jsonNode = sanitizePropertyNames(jsonNode);
+      }
       // Emit the Transformed Output
       context.output(XFORM_SUCCESS, jsonNode.toString());
       this.xformSuccess.inc();

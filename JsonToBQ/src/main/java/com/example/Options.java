@@ -159,4 +159,11 @@ public interface Options
   ValueProvider<String> getCustomDataTypeExcludingFieldSelectorValue();
 
   void setCustomDataTypeExcludingFieldSelectorValue(ValueProvider<String> value);
+
+  @Description(
+      "Indicates if the pipeline should sanitize json property names, making it sure they're valid BQ column names.")
+  @Default.Boolean(false)
+  ValueProvider<Boolean> getSanitizeJson();
+
+  void setSanitizeJson(ValueProvider<Boolean> value);
 }

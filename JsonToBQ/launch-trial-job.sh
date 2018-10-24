@@ -60,6 +60,7 @@ CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR="<fieldR>"
 CUSTOMDATATYPE="<datatypename1>"
 # EXCLUDEFIELDS applies only for Variable Schema Custom Data where data properties maybe loaded as Strings
 #EXCLUDEFIELDS=""
+SANITIZE_JSON="true"
 
 java \
   -jar ${JOBJAR} \
@@ -90,4 +91,5 @@ java \
   --customDataTypeFieldSelector=${CUSTOMDATATYPE_FIELDSELECTOR} \
   --customDataTypeExcludingFieldSelector=${CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR} \
   --customDataType=${CUSTOMDATATYPE} \
+  --sanitizeJson=${SANITIZE_JSON} \
   --filterCustomFields=${INCLUDEFIELDS}
