@@ -13,9 +13,9 @@ public class ExtractCustomDoFn extends DoFn<String, String> {
 
   public static final TupleTag<String> EXTRACTCUSTOM_SUCCESS = new TupleTag<String>() {};
   public static final TupleTag<String> EXTRACTCUSTOM_FAILED = new TupleTag<String>() {};
-  private static final List<String> VALID_CUSTOM_TYPES = Splitter.on(',').splitToList(JsonToBQ.options.getValidCustomDataTypes().get());
-  private static final String CUSTOMDATATYPE_FIELDSELECTOR = JsonToBQ.options.getCustomDataTypeFieldSelector().get();
-  private static final String CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE = JsonToBQ.options.getCustomDataTypeExcludingFieldSelectorValue().get();
+  private final List<String> VALID_CUSTOM_TYPES = Splitter.on(',').splitToList(JsonToBQ.options.getValidCustomDataTypes().get());
+  private final String CUSTOMDATATYPE_FIELDSELECTOR = JsonToBQ.options.getCustomDataTypeFieldSelector().get();
+  private final String CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE = JsonToBQ.options.getCustomDataTypeExcludingFieldSelectorValue().get();
   private final List<String> filter;
   private final String customDataType;
   private final Counter extractedCustomRows;
