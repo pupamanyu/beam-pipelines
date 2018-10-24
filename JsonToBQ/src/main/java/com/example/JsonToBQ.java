@@ -172,7 +172,7 @@ public class JsonToBQ {
                       .withOutputTags(
                           DeSensitizeDoFn.DESENSITIZED_SUCCESS,
                           TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
-
+      }
       /* Validate the JSON Rows, Handle invalid/mistyped JSON rows separately */
       PCollectionTuple jsonRows =
           desensitizedRows
