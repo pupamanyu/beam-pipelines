@@ -51,6 +51,8 @@ public class TransformJsonDoFn extends DoFn<String, String> {
   private String timestampField;
   private String partitionField;
   private final Boolean sanitizeJson = JsonToBQ.options.getSanitizeJson().get();
+  private final Boolean stringifyCustomData = JsonToBQ.options.getStringifyCustomData().get();
+  private final String customDataField = JsonToBQ.options.getCustomDataField().get();
 
   public TransformJsonDoFn(
       ValueProvider<String> timestampColumn,
@@ -109,6 +111,14 @@ public class TransformJsonDoFn extends DoFn<String, String> {
     return jsonNode;
   }
 
+  static JsonNode stringifyCustomData(JsonNode json, String customPropertyName) {
+    ObjectNode objNode = (ObjectNode) json;
+    if (objNode.has(customPropertyName)) {
+      objNode.put(customPropertyName, objNode.get(customPropertyName).toString());
+    }
+    return objNode;
+  }
+
   @StartBundle
   public void startBundle(StartBundleContext startBundleContext) {
     this.DATE_FORMAT = new SimpleDateFormat(dateFormat.get());
@@ -125,6 +135,9 @@ public class TransformJsonDoFn extends DoFn<String, String> {
       jsonNode = insertTimestampPartition(jsonNode);
       if (sanitizeJson) {
         jsonNode = sanitizePropertyNames(jsonNode);
+      }
+      if (stringifyCustomData) {
+        jsonNode = stringifyCustomData(jsonNode, this.customDataField);
       }
       // Emit the Transformed Output
       context.output(XFORM_SUCCESS, jsonNode.toString());

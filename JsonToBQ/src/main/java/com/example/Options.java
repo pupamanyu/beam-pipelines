@@ -166,4 +166,18 @@ public interface Options
   ValueProvider<Boolean> getSanitizeJson();
 
   void setSanitizeJson(ValueProvider<Boolean> value);
+
+  @Description(
+      "Defines if the custom data portion of the information will be converted as a String. This is required for Custom Data only. Default value is not used at all")
+  @Default.Boolean(false)
+  ValueProvider<Boolean> getStringifyCustomData();
+
+  void setStringifyCustomData(ValueProvider<Boolean> value);
+
+  @Description(
+      "Name of the property that holds the custom data. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataField();
+
+  void setCustomDataField(ValueProvider<String> value);
 }
