@@ -3,6 +3,13 @@ version '1.0'
 
 
 apply plugin: 'java'
+apply plugin: 'idea'
+
+idea{
+    module{
+        downloadJavadoc=true
+    }
+}
 
 sourceCompatibility = 1.8
 targetCompatibility = 1.8
@@ -23,12 +30,17 @@ repositories {
 buildscript {
     repositories {
         jcenter()
+        maven {
+          url "https://plugins.gradle.org/m2/"        
+        }
     }
     dependencies {
         classpath 'com.github.jengelman.gradle.plugins:shadow:4.0.1'
+        classpath "gradle.plugin.net.java.openjdk.shinyafox:jshell-gradle-plugin:1.0.4"
     }
 }
 
+apply plugin: "net.java.openjdk.shinyafox.jshell.gradle.plugin"
 apply plugin: 'com.github.johnrengelman.shadow'
 
 jar {
@@ -77,5 +89,5 @@ test {
         // standard out or error is shown
         // in Gradle output.
         showStandardStreams = true
-     }
+    }
 }
