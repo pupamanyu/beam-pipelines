@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import org.apache.beam.sdk.metrics.Counter;
@@ -27,9 +26,11 @@ import org.everit.json.schema.ValidationException;
 
 public class ValidateJsonDoFn extends DoFn<String, String> {
 
-  public static final TupleTag<String> VALIDATEDJSON = new TupleTag<String>() {};
-  public static final TupleTag<KV<String, String>> INVALIDATEDJSON =
-      new TupleTag<KV<String, String>>() {};
+  public static final TupleTag<String> VALIDATEDJSON = new TupleTag<String>() {
+  };
+  public static final TupleTag<KV<String, String>> INVALIDATEDJSON
+          = new TupleTag<KV<String, String>>() {
+  };
   private final Counter validatedJson;
   private final Counter invalidatedJson;
   private final ValidationUtils validationUtils;

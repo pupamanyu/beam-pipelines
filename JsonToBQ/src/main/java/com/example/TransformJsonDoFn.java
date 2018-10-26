@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -38,32 +37,40 @@ import java.util.Iterator;
 
 public class TransformJsonDoFn extends DoFn<String, String> {
 
-  public static final TupleTag<String> XFORM_SUCCESS = new TupleTag<String>() {};
-  public static final TupleTag<String> XFORM_FAILED = new TupleTag<String>() {};
+  public static final TupleTag<String> XFORM_SUCCESS = new TupleTag<String>() {
+  };
+  public static final TupleTag<String> XFORM_FAILED = new TupleTag<String>() {
+  };
   private static final Logger LOG = LoggerFactory.getLogger(TransformJsonDoFn.class);
   private final Counter xformSuccess;
   private final Counter jsonParseErrors;
   private final ObjectMapper objectMapper;
   private SimpleDateFormat DATE_FORMAT;
-  private ValueProvider<String> timestampColumn;
-  private ValueProvider<String> partitionColumn;
-  private ValueProvider<String> dateFormat;
+  private final ValueProvider<String> timestampColumn;
+  private final ValueProvider<String> partitionColumn;
+  private final ValueProvider<String> dateFormat;
   private String timestampField;
   private String partitionField;
-  private final Boolean sanitizeJson = JsonToBQ.options.getSanitizeJson().get();
-  private final Boolean stringifyCustomData = JsonToBQ.options.getStringifyCustomData().get();
-  private final String customDataField = JsonToBQ.options.getCustomDataField().get();
+  private final Boolean sanitizeJson;
+  private final Boolean stringifyCustomData;
+  private final String customDataField;
 
   public TransformJsonDoFn(
-      ValueProvider<String> timestampColumn,
-      ValueProvider<String> partitionColumn,
-      ValueProvider<String> dateFormat) {
+          ValueProvider<String> timestampColumn,
+          ValueProvider<String> partitionColumn,
+          ValueProvider<String> dateFormat,
+          ValueProvider<Boolean> sanitizeJson,
+          ValueProvider<Boolean> stringifyCustomData,
+          ValueProvider<String> customDataField) {
     this.jsonParseErrors = Metrics.counter(TransformJsonDoFn.class, "jsonparse-error-counts");
     this.xformSuccess = Metrics.counter(TransformJsonDoFn.class, "successful-transform-counts");
     this.timestampColumn = timestampColumn;
     this.partitionColumn = partitionColumn;
     this.dateFormat = dateFormat;
     this.objectMapper = new ObjectMapper();
+    this.sanitizeJson = sanitizeJson.get();
+    this.stringifyCustomData = stringifyCustomData.get();
+    this.customDataField = customDataField.get();
   }
 
   static String sanitizeString(String str) {
@@ -79,8 +86,8 @@ public class TransformJsonDoFn extends DoFn<String, String> {
       if (elt.getValue().isObject()) {
         JsonNode sanitized = sanitizePropertyNames(elt.getValue());
         objects.put(elt.getKey(), sanitized);
-      } else if (!elt.getValue().isArray()){
-        if (elt.getKey().contains(": ") || elt.getKey().contains(".") || elt.getKey().contains(" ")){
+      } else if (!elt.getValue().isArray()) {
+        if (elt.getKey().contains(": ") || elt.getKey().contains(".") || elt.getKey().contains(" ")) {
           toBeSanitized.put(elt.getKey(), null);
         }
       }
@@ -98,15 +105,15 @@ public class TransformJsonDoFn extends DoFn<String, String> {
 
   private JsonNode insertTimestampPartition(JsonNode jsonNode) {
     if (jsonNode.has(this.timestampField)) {
-      jsonNode =
-          ((ObjectNode) jsonNode)
-              .put(
-                  this.partitionField,
-                  DATE_FORMAT.format(new Date(jsonNode.get(this.timestampField).asLong())));
+      jsonNode
+              = ((ObjectNode) jsonNode)
+                      .put(
+                              this.partitionField,
+                              DATE_FORMAT.format(new Date(jsonNode.get(this.timestampField).asLong())));
     } else {
       LOG.error(
-          "The Input Data does not contain the Specified Timestamp Column {}. Load Job will fail",
-          this.timestampColumn);
+              "The Input Data does not contain the Specified Timestamp Column {}. Load Job will fail",
+              this.timestampColumn);
     }
     return jsonNode;
   }
@@ -121,7 +128,6 @@ public class TransformJsonDoFn extends DoFn<String, String> {
 
   @StartBundle
   public void startBundle(StartBundleContext startBundleContext) {
-    this.DATE_FORMAT = new SimpleDateFormat(dateFormat.get());
     this.timestampField = this.timestampColumn.get();
     this.partitionField = this.partitionColumn.get();
     this.DATE_FORMAT = new SimpleDateFormat(dateFormat.get());

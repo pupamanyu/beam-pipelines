@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import org.everit.json.schema.Schema;
@@ -33,10 +32,9 @@ public class ValidationUtils implements Serializable {
     this.jsonSchema = jsonSchema;
   }
 
-  public  void validate(String json) throws ValidationException {
+  public void validate(String json) throws ValidationException {
     try {
-      Schema schema =
-          SchemaLoader.builder()
+      Schema schema = SchemaLoader.builder()
               .schemaJson(new JSONObject(this.jsonSchema))
               .draftV7Support()
               .build()

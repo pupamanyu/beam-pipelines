@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.google.common.hash.Hashing;
@@ -30,10 +29,10 @@ import java.security.GeneralSecurityException;
 import java.security.Security;
 
 /**
- * This Utility Class can be used to a) Deterministically Encrypt the Sensitive PII Data and Encode
- * the resultant ByteArray to Base64 Encoded String b) Convert sensitive data values to sha256, and
- * storing the hash mapping in another highly restricted mapping table. If there is no need for
- * extracting the original string value, then just hashing would suffice
+ * This Utility Class can be used to a) Deterministically Encrypt the Sensitive PII Data and Encode the resultant
+ * ByteArray to Base64 Encoded String b) Convert sensitive data values to sha256, and storing the hash mapping in
+ * another highly restricted mapping table. If there is no need for extracting the original string value, then just
+ * hashing would suffice
  */
 public class EncryptUtils {
 
@@ -52,13 +51,13 @@ public class EncryptUtils {
 
   public byte[] encrypt(String data, String associatedData) throws GeneralSecurityException {
     return DeterministicAeadFactory.getPrimitive(this.keysetHandle)
-        .encryptDeterministically(data.getBytes(), associatedData.getBytes());
+            .encryptDeterministically(data.getBytes(), associatedData.getBytes());
   }
 
   public String decrypt(byte[] data, String associatedData) throws GeneralSecurityException {
     return new String(
-        DeterministicAeadFactory.getPrimitive(this.keysetHandle)
-            .decryptDeterministically(data, associatedData.getBytes()));
+            DeterministicAeadFactory.getPrimitive(this.keysetHandle)
+                    .decryptDeterministically(data, associatedData.getBytes()));
   }
 
   private String hash(String data) {
@@ -82,7 +81,7 @@ public class EncryptUtils {
   }
 
   public String extractSensitiveData(String data, String associatedData)
-      throws GeneralSecurityException {
+          throws GeneralSecurityException {
     return decrypt(decode(data), associatedData);
   }
 }
