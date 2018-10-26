@@ -1,6 +1,6 @@
 package com.example;
 
-import com.google.common.base.Splitter;
+import java.util.Arrays;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Metrics;
 import org.apache.beam.sdk.transforms.DoFn;
@@ -10,30 +10,40 @@ import org.json.JSONObject;
 import org.json.JSONException;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 public class ExtractCustomDoFn extends DoFn<String, String> {
 
-  public static final TupleTag<String> EXTRACTCUSTOM_SUCCESS = new TupleTag<String>() {};
-  public static final TupleTag<KV<String, String>> EXTRACTCUSTOM_FAILED = new TupleTag<KV<String, String>>() {};
-  private final List<String> VALID_CUSTOM_TYPES = Splitter.on(',').splitToList(JsonToBQ.options.getValidCustomDataTypes().get());
-  private final String CUSTOMDATATYPE_FIELDSELECTOR = JsonToBQ.options.getCustomDataTypeFieldSelector().get();
-  private final String CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE = JsonToBQ.options.getCustomDataTypeExcludingFieldSelectorValue().get();
+  public static final TupleTag<String> EXTRACTCUSTOM_SUCCESS = new TupleTag<String>() {
+  };
+  public static final TupleTag<KV<String, String>> EXTRACTCUSTOM_FAILED = new TupleTag<KV<String, String>>() {
+  };
+  private final Boolean exclude;
+  private final List<String> validCustomTypes;
+  private final String customDataTypeFieldSelector;
+  private final String customDataTypeExcludingFieldSelectorValue;
   private final List<String> filter;
   private final String customDataType;
   private final Counter extractedCustomRows;
+  private final Counter extractedExcludedCustomRows;
   private final Counter discardedCustomRows;
   private final Counter failedExtractCustomRows;
 
-
-  public ExtractCustomDoFn(String customDataType, String customFields) {
+  public ExtractCustomDoFn(Boolean exclude, String customDataType, String customFields,
+          String validCustomTypes, String customDataTypeFieldSelector,
+          String customDataTypeExcludingFieldSelectorValue) {
+    this.exclude = exclude;
     this.customDataType = customDataType;
-    if (VALID_CUSTOM_TYPES.stream().noneMatch(this.customDataType::equals))
+    this.validCustomTypes = Arrays.asList(validCustomTypes.split(",")).stream().map(String::trim).collect(Collectors.toList());
+    this.customDataTypeFieldSelector = customDataTypeFieldSelector;
+    this.customDataTypeExcludingFieldSelectorValue = customDataTypeExcludingFieldSelectorValue;
+    if (this.validCustomTypes.stream().noneMatch(this.customDataType::equals)) {
       throw new RuntimeException(
-          "Initialization Error. Invalid Custom Data Type "
-              + this.customDataType
-              + " provided. Please check");
-    this.filter = Splitter.on(',').omitEmptyStrings().trimResults().splitToList(customFields);
+              String.format("Initialization Error. Invalid Custom Data Type %s provided. Please check", this.customDataType));
+    }
+    this.filter = Arrays.asList(customFields.split(",")).stream().map(String::trim).filter(s -> !s.isEmpty()).collect(Collectors.toList());
     this.extractedCustomRows = Metrics.counter(ExtractCustomDoFn.class, this.customDataType + "-row-counts");
+    this.extractedExcludedCustomRows = Metrics.counter(ExtractCustomDoFn.class, this.customDataType + "-excluded-row-counts");
     this.discardedCustomRows = Metrics.counter(ExtractCustomDoFn.class, "filteredout-row-counts");
     this.failedExtractCustomRows = Metrics.counter(ExtractCustomDoFn.class, "failed-customextract-row-counts");
   }
@@ -42,16 +52,17 @@ public class ExtractCustomDoFn extends DoFn<String, String> {
   public void processElement(ProcessContext context) {
     try {
       JSONObject element = new JSONObject(context.element());
-      if (element.has(CUSTOMDATATYPE_FIELDSELECTOR) && element.get(CUSTOMDATATYPE_FIELDSELECTOR) instanceof String) {
-        if (this.customDataType.equals(CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR_VALUE)
-            && this.filter
-                .stream()
-                .noneMatch(element.getString(CUSTOMDATATYPE_FIELDSELECTOR)::equals)) {
+      if (element.has(customDataTypeFieldSelector) && element.get(customDataTypeFieldSelector) instanceof String) {
+        if (exclude && this.customDataType.equals(customDataTypeExcludingFieldSelectorValue)
+                && this.filter
+                        .stream()
+                        .map(String::toLowerCase)
+                        .noneMatch(element.getString(customDataTypeFieldSelector).toLowerCase()::equals)) {
           context.output(EXTRACTCUSTOM_SUCCESS, context.element());
-          this.extractedCustomRows.inc();
-        } else if (this.filter
-            .stream()
-            .anyMatch(element.getString(CUSTOMDATATYPE_FIELDSELECTOR)::equals)) {
+          this.extractedExcludedCustomRows.inc();
+        } else if (!exclude && this.filter
+                .stream().map(String::toLowerCase)
+                .anyMatch(element.getString(customDataTypeFieldSelector).toLowerCase()::matches)) {
           context.output(EXTRACTCUSTOM_SUCCESS, context.element());
           this.extractedCustomRows.inc();
         } else {
@@ -59,15 +70,15 @@ public class ExtractCustomDoFn extends DoFn<String, String> {
         }
       } else {
         KV<String, String> errorData = KV.of(
-          context.element(),
-          String.format("{\"message\":\"selector field not usable: %s\"}", CUSTOMDATATYPE_FIELDSELECTOR));
+                context.element(),
+                String.format("{\"message\":\"selector field not usable: %s\"}", customDataTypeFieldSelector));
         context.output(EXTRACTCUSTOM_FAILED, errorData);
         this.failedExtractCustomRows.inc();
       }
     } catch (JSONException jsex) {
       KV<String, String> errorData = KV.of(
-        context.element(),
-        String.format("{\"message\":\"%s\"}", jsex.getMessage()));
+              context.element(),
+              String.format("{\"message\":\"%s\"}", jsex.getMessage()));
       context.output(EXTRACTCUSTOM_FAILED, errorData);
       this.failedExtractCustomRows.inc();
     }

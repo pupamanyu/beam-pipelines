@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.google.api.services.bigquery.model.TableFieldSchema;
@@ -23,9 +22,6 @@ import com.google.api.services.bigquery.model.TableReference;
 import com.google.api.services.bigquery.model.TableRow;
 import com.google.api.services.bigquery.model.TableSchema;
 import com.google.api.services.bigquery.model.TimePartitioning;
-import com.google.common.base.Joiner;
-import com.google.common.base.Splitter;
-import com.google.common.collect.Lists;
 import org.apache.beam.sdk.Pipeline;
 import org.apache.beam.sdk.io.Compression;
 import org.apache.beam.sdk.io.FileIO;
@@ -47,7 +43,10 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.List;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 public class JsonToBQ {
 
@@ -59,7 +58,7 @@ public class JsonToBQ {
     options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
 
     options.setJobName(
-        options.getJobTagPrefix().get()
+            options.getJobTagPrefix().get()
             + '-'
             + options.getOutputTableName().get()
             + '-'
@@ -83,15 +82,12 @@ public class JsonToBQ {
     /* Set Schema for Error Table where invalidated input is stored */
     TableSchema errorTableSchema = new TableSchema();
     ArrayList<TableFieldSchema> fieldSchema = new ArrayList<TableFieldSchema>();
-    fieldSchema.add(
-        new TableFieldSchema()
+    fieldSchema.add(new TableFieldSchema()
             .setName(options.getErrorTablePartitionColumn().get())
             .setMode("NULLABLE")
             .setType("DATE"));
-    fieldSchema.add(
-        new TableFieldSchema().setName("input_row").setMode("NULLABLE").setType("STRING"));
-    fieldSchema.add(
-        new TableFieldSchema().setName("error_message").setMode("NULLABLE").setType("STRING"));
+    fieldSchema.add(new TableFieldSchema().setName("input_row").setMode("NULLABLE").setType("STRING"));
+    fieldSchema.add(new TableFieldSchema().setName("error_message").setMode("NULLABLE").setType("STRING"));
     errorTableSchema.setFields(fieldSchema);
 
     /* PCollectionList to hold Valid TableRows for bulk ingestion into Main Table*/
@@ -100,181 +96,180 @@ public class JsonToBQ {
     /* PCollectionList to hold Invalid Input for bulk ingestion into Error Table*/
     PCollectionList<TableRow> errorPCollectionList = PCollectionList.empty(p);
 
-    for (String prefix : Splitter.on(",").trimResults().split(options.getInputPrefixes().get())) {
-      ArrayList<String> prefixList =
-          Lists.newArrayList((Splitter.on("-").trimResults().split(prefix)));
+    for (String prefix : Arrays.asList(options.getInputPrefixes().get().split(","))) {
+      List<String> prefixList = Arrays.asList(prefix.trim().split("-"));
       /* TODO: Make these more generic prefix DATE, TIMESTAMP */
       prefixList.set(0, "year=" + prefixList.get(0));
       prefixList.set(1, "month=" + prefixList.get(1));
       prefixList.set(2, "day=" + prefixList.get(2));
-      String subPrefix = Joiner.on('/').join(prefixList);
-      String inputFilePattern =
-          options.getInputDirectory().get()
+      String subPrefix = prefixList.stream().collect(Collectors.joining("/"));
+      String inputFilePattern = options.getInputDirectory().get()
               + '/'
               + subPrefix
               + '/'
               + "**"
               + options.getInputFilenameSuffix().get();
       /* Extract Lines from the files, Handle failed files separately. */
-      PCollectionTuple inputRows =
-          p.apply(
-                  "Match Input Files for: " + prefix,
-                  FileIO.match()
+      PCollectionTuple inputRows = p.apply(
+              "Match Input Files for: " + prefix,
+              FileIO.match()
                       .filepattern(inputFilePattern)
                       .withEmptyMatchTreatment(EmptyMatchTreatment.ALLOW_IF_WILDCARD))
               .apply(
-                  "Get Readable Files for: " + prefix,
-                  FileIO.readMatches().withCompression(Compression.AUTO))
+                      "Get Readable Files for: " + prefix,
+                      FileIO.readMatches().withCompression(Compression.AUTO))
               .apply(
-                  "Read File Line by Line for: " + prefix,
-                  ParDo.of(new ReadableFileToStringDoFn())
-                      .withOutputTags(
-                          ReadableFileToStringDoFn.VALIDROWS,
-                          TupleTagList.of(ReadableFileToStringDoFn.FAILEDFILES)));
+                      "Read File Line by Line for: " + prefix,
+                      ParDo.of(new ReadableFileToStringDoFn())
+                              .withOutputTags(
+                                      ReadableFileToStringDoFn.VALIDROWS,
+                                      TupleTagList.of(ReadableFileToStringDoFn.FAILEDFILES)));
 
       final PCollectionTuple desensitizedRows;
 
       if (options.getCustomDataType().get().trim().isEmpty()) {
         /* Desensitize the Rows by removing PII */
         desensitizedRows = inputRows
-          .get(ReadableFileToStringDoFn.VALIDROWS)
-            .apply(
-              "Desensitize Data for: " + prefix,
-              ParDo.of(
-                      new DeSensitizeDoFn(
-                          options.getSensitiveFields(), options.getGeoRootFieldName()))
-                  .withOutputTags(
-                      DeSensitizeDoFn.DESENSITIZED_SUCCESS,
-                      TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));;
-      } else {
-        /* Extract Custom Data Type from Configuration */
-        PCollectionTuple extractedCustomRows =
-            inputRows
                 .get(ReadableFileToStringDoFn.VALIDROWS)
                 .apply(
-                    "Extract Custom Data " + options.getCustomDataType().get() + " for: " + prefix,
-                    ParDo.of(
-                        new ExtractCustomDoFn(
-                            options.getCustomDataType().get(),
-                            options.getFilterCustomFields().get()))
-                        .withOutputTags(
-                            ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS,
-                            TupleTagList.of(ExtractCustomDoFn.EXTRACTCUSTOM_FAILED)));
+                        "Desensitize Data for: " + prefix,
+                        ParDo.of(
+                                new DeSensitizeDoFn(
+                                        options.getSensitiveFields(), options.getGeoRootFieldName()))
+                                .withOutputTags(
+                                        DeSensitizeDoFn.DESENSITIZED_SUCCESS,
+                                        TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));;
+      } else {
+        /* Extract Custom Data Type from Configuration */
+        Boolean exclude = options.getFilterCustomFields().get().isEmpty();
+        String filterFields = exclude ? options.getExcludedFilterCustomFields().get() : options.getFilterCustomFields().get();
+        LOG.info("Using filterfields: %s", filterFields);
+        PCollectionTuple extractedCustomRows = inputRows
+                .get(ReadableFileToStringDoFn.VALIDROWS)
+                .apply(
+                        "Extract Custom Data " + options.getCustomDataType().get() + " for: " + prefix,
+                        ParDo.of(new ExtractCustomDoFn(
+                                exclude,
+                                options.getCustomDataType().get(),
+                                filterFields,
+                                options.getValidCustomDataTypes().get(),
+                                options.getCustomDataTypeFieldSelector().get(),
+                                options.getCustomDataTypeExcludingFieldSelectorValue().get()))
+                                .withOutputTags(
+                                        ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS,
+                                        TupleTagList.of(ExtractCustomDoFn.EXTRACTCUSTOM_FAILED)));
 
         /* Desensitize the Rows by removing PII */
-        desensitizedRows =
-            extractedCustomRows.get(ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS)
-              .apply(
-                  "Desensitize Data for: " + prefix,
-                  ParDo.of(
-                          new DeSensitizeDoFn(
-                              options.getSensitiveFields(), options.getGeoRootFieldName()))
-                      .withOutputTags(
-                          DeSensitizeDoFn.DESENSITIZED_SUCCESS,
-                          TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
+        desensitizedRows = extractedCustomRows.get(ExtractCustomDoFn.EXTRACTCUSTOM_SUCCESS)
+                .apply(
+                        "Desensitize Data for: " + prefix,
+                        ParDo.of(
+                                new DeSensitizeDoFn(
+                                        options.getSensitiveFields(), options.getGeoRootFieldName()))
+                                .withOutputTags(
+                                        DeSensitizeDoFn.DESENSITIZED_SUCCESS,
+                                        TupleTagList.of(DeSensitizeDoFn.DESENSITIZED_FAILED)));
       }
       /* Validate the JSON Rows, Handle invalid/mistyped JSON rows separately */
-      PCollectionTuple jsonRows =
-          desensitizedRows
+      PCollectionTuple jsonRows = desensitizedRows
               .get(DeSensitizeDoFn.DESENSITIZED_SUCCESS)
               .apply(
-                  "Validate JSON Against the JSON Schema for: " + prefix,
-                  ParDo.of(new ValidateJsonDoFn(jsonSchema))
-                      .withOutputTags(
-                          ValidateJsonDoFn.VALIDATEDJSON,
-                          TupleTagList.of(ValidateJsonDoFn.INVALIDATEDJSON)));
+                      "Validate JSON Against the JSON Schema for: " + prefix,
+                      ParDo.of(new ValidateJsonDoFn(jsonSchema))
+                              .withOutputTags(
+                                      ValidateJsonDoFn.VALIDATEDJSON,
+                                      TupleTagList.of(ValidateJsonDoFn.INVALIDATEDJSON)));
 
       /* Success Path: Apply Transformations to JSON Rows, Handle failures separately */
-      PCollectionTuple transformedJsonRows =
-          jsonRows
+      PCollectionTuple transformedJsonRows = jsonRows
               .get(ValidateJsonDoFn.VALIDATEDJSON)
               .apply(
-                  "Transform/Mutate JSON Fields for: " + prefix,
-                  ParDo.of(
-                          new TransformJsonDoFn(
-                              options.getTimestampColumn(),
-                              options.getOutputTablePartitionColumn(),
-                              options.getPartitionColumnDateFormat()))
-                      .withOutputTags(
-                          TransformJsonDoFn.XFORM_SUCCESS,
-                          TupleTagList.of(TransformJsonDoFn.XFORM_FAILED)));
+                      "Transform/Mutate JSON Fields for: " + prefix,
+                      ParDo.of(
+                              new TransformJsonDoFn(
+                                      options.getTimestampColumn(),
+                                      options.getOutputTablePartitionColumn(),
+                                      options.getPartitionColumnDateFormat(),
+                                      options.getSanitizeJson(),
+                                      options.getStringifyCustomData(),
+                                      options.getCustomDataField()))
+                              .withOutputTags(
+                                      TransformJsonDoFn.XFORM_SUCCESS,
+                                      TupleTagList.of(TransformJsonDoFn.XFORM_FAILED)));
 
       /* Success Path: Mutate JSON to TableRow */
-      PCollectionTuple inputTableRows =
-          transformedJsonRows
-              .get(TransformJsonDoFn.XFORM_SUCCESS)
-              .apply(
-                  "Mutate JSON to TableRow for: " + prefix,
-                  ParDo.of(new JsonToTableRowDoFn())
-                      .withOutputTags(
-                          JsonToTableRowDoFn.VALIDTABLEROWS,
-                          TupleTagList.of(JsonToTableRowDoFn.INVALIDTABLEROWS)));
+      PCollectionTuple inputTableRows
+              = transformedJsonRows
+                      .get(TransformJsonDoFn.XFORM_SUCCESS)
+                      .apply(
+                              "Mutate JSON to TableRow for: " + prefix,
+                              ParDo.of(new JsonToTableRowDoFn())
+                                      .withOutputTags(
+                                              JsonToTableRowDoFn.VALIDTABLEROWS,
+                                              TupleTagList.of(JsonToTableRowDoFn.INVALIDTABLEROWS)));
 
       /* Success Path: Collect TableRow PCollection into a List for merging*/
-      tableRowPCollectionList =
-          tableRowPCollectionList.and(inputTableRows.get(JsonToTableRowDoFn.VALIDTABLEROWS));
+      tableRowPCollectionList
+              = tableRowPCollectionList.and(inputTableRows.get(JsonToTableRowDoFn.VALIDTABLEROWS));
 
       /* Filter invalid/mistyped JSON */
-      PCollection<KV<String, String>> invalidatedJSONCollection =
-          jsonRows.get(ValidateJsonDoFn.INVALIDATEDJSON);
+      PCollection<KV<String, String>> invalidatedJSONCollection
+              = jsonRows.get(ValidateJsonDoFn.INVALIDATEDJSON);
 
-      PCollection<TableRow> errorTableRows =
-          invalidatedJSONCollection.apply(
+      PCollection<TableRow> errorTableRows = invalidatedJSONCollection.apply(
               "Mutate Error Data Pair to TableRow for: " + prefix,
               ParDo.of(
-                  new ErrorDataToTableRowFn(
-                      ValueProvider.StaticValueProvider.of(prefix),
-                      options.getErrorTablePartitionColumn())));
+                      new ErrorDataToTableRowFn(
+                              ValueProvider.StaticValueProvider.of(prefix),
+                              options.getErrorTablePartitionColumn())));
 
       /* Error Path: Collect Error Data PCollection into a List for merging */
       errorPCollectionList = errorPCollectionList.and(errorTableRows);
     }
 
     /* Merge Table Rows for valid Data */
-    PCollection<TableRow> mergedValidTableRows =
-        tableRowPCollectionList
+    PCollection<TableRow> mergedValidTableRows = tableRowPCollectionList
             .apply(
-                "Merge Validated TableRows for: " + options.getInputPrefixes().get(),
-                Flatten.<TableRow>pCollections())
+                    "Merge Validated TableRows for: " + options.getInputPrefixes().get(),
+                    Flatten.<TableRow>pCollections())
             .setCoder(TableRowJsonCoder.of());
 
     /* Merge TableRows for error Data */
-    PCollection<TableRow> mergedErrorTableRows =
-        errorPCollectionList
+    PCollection<TableRow> mergedErrorTableRows = errorPCollectionList
             .apply(
-                "Merge Invalidated Error Data for: " + options.getInputPrefixes().get(),
-                Flatten.<TableRow>pCollections())
+                    "Merge Invalidated Error Data for: " + options.getInputPrefixes().get(),
+                    Flatten.<TableRow>pCollections())
             .setCoder(TableRowJsonCoder.of());
 
     /* Success Path: Load Validated TableRows to BQ */
-    /* Load Valid Data into BQ */
+ /* Load Valid Data into BQ */
     mergedValidTableRows.apply(
-        "Load Validated Data into "
+            "Load Validated Data into "
             + options.getOutputTableName()
             + " for: "
             + options.getInputPrefixes().get(),
-        BigQueryIO.writeTableRows()
-            .withSchema(SchemaUtils.getTableSchema(bqSchema))
-            .to(tableReference)
-            .withTimePartitioning(
-                new TimePartitioning().setField(options.getOutputTablePartitionColumn().get()))
-            .withCreateDisposition(CreateDisposition.CREATE_NEVER)
-            .withWriteDisposition(WriteDisposition.WRITE_APPEND));
+            BigQueryIO.writeTableRows()
+                    .withSchema(SchemaUtils.getTableSchema(bqSchema))
+                    .to(tableReference)
+                    .withTimePartitioning(
+                            new TimePartitioning().setField(options.getOutputTablePartitionColumn().get()))
+                    .withCreateDisposition(CreateDisposition.CREATE_NEVER)
+                    .withWriteDisposition(WriteDisposition.WRITE_APPEND));
 
     /* Error Path: Load Invalidated TableRows to BQ */
-    /* Load Error Data into BQ */
+ /* Load Error Data into BQ */
     mergedErrorTableRows.apply(
-        "Load Invalidated Data into "
+            "Load Invalidated Data into "
             + options.getErrorTableName()
             + "  for: "
             + options.getInputPrefixes().get(),
-        BigQueryIO.writeTableRows()
-            .withSchema(errorTableSchema)
-            .to(errorTableReference)
-            .withTimePartitioning(
-                new TimePartitioning().setField(options.getErrorTablePartitionColumn().get()))
-            .withCreateDisposition(CreateDisposition.CREATE_NEVER)
-            .withWriteDisposition(WriteDisposition.WRITE_APPEND));
+            BigQueryIO.writeTableRows()
+                    .withSchema(errorTableSchema)
+                    .to(errorTableReference)
+                    .withTimePartitioning(
+                            new TimePartitioning().setField(options.getErrorTablePartitionColumn().get()))
+                    .withCreateDisposition(CreateDisposition.CREATE_NEVER)
+                    .withWriteDisposition(WriteDisposition.WRITE_APPEND));
     p.run();
   }
 }

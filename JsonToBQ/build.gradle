@@ -69,8 +69,6 @@ dependencies {
     // https://mvnrepository.com/artifact/com.google.cloud/google-cloud-bigquery
     compile group: 'com.google.cloud', name: 'google-cloud-bigquery', version: '1.49.0'
 
-    // Google Guava
-    compile group: 'com.google.guava', name: 'guava', version: '26.0-jre'
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-api
     compile group: 'org.slf4j', name: 'slf4j-api', version: '1.7.25'
     // https://mvnrepository.com/artifact/org.slf4j/slf4j-log4j12
