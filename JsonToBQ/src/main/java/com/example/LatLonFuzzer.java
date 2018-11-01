@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import java.math.RoundingMode;
@@ -23,6 +22,7 @@ import java.text.DecimalFormat;
 import java.util.Random;
 
 public class LatLonFuzzer {
+
   private static final int EARTH_RADIUS_METERS = 6378000;
   private static final Random rand = new Random(System.nanoTime());
 
@@ -44,7 +44,7 @@ public class LatLonFuzzer {
   public static double fuzzLongitude(double lat, double lon, int meters) {
     double dx = fuzz(meters);
     return roundCDecimal(
-        lon + (dx / EARTH_RADIUS_METERS) * (180 / Math.PI) / Math.cos(lat * Math.PI / 180));
+            lon + (dx / EARTH_RADIUS_METERS) * (180 / Math.PI) / Math.cos(lat * Math.PI / 180));
   }
 
   public static LatLon fuzzLatLon(double lat, double lon, int meters) {
@@ -53,11 +53,12 @@ public class LatLonFuzzer {
 
   public static LatLon fuzzLatLon(LatLon latlon, int meters) {
     return LatLon.of(
-        fuzzLatitude(latlon.latitude, meters),
-        fuzzLongitude(latlon.latitude, latlon.longitude, meters));
+            fuzzLatitude(latlon.latitude, meters),
+            fuzzLongitude(latlon.latitude, latlon.longitude, meters));
   }
 
   public static class LatLon {
+
     public final double latitude;
     public final double longitude;
 

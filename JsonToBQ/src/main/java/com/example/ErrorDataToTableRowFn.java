@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.google.api.services.bigquery.model.TableRow;
@@ -26,13 +25,14 @@ import org.apache.beam.sdk.transforms.DoFn;
 import org.apache.beam.sdk.values.KV;
 
 public class ErrorDataToTableRowFn extends DoFn<KV<String, String>, TableRow> {
+
   private final Counter errors;
   private String partitionColumnName;
   private String partitionColumnValue;
   private TableRow errorTableRow;
 
   public ErrorDataToTableRowFn(
-      ValueProvider<String> partitionColumnValue, ValueProvider<String> errorTablePartitionColumn) {
+          ValueProvider<String> partitionColumnValue, ValueProvider<String> errorTablePartitionColumn) {
     this.partitionColumnValue = partitionColumnValue.get();
     this.partitionColumnName = errorTablePartitionColumn.get();
     this.errors = Metrics.counter(ErrorDataToTableRowFn.class, "error-counts");

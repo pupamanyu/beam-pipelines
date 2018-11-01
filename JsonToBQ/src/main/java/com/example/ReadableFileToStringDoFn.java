@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import org.apache.beam.sdk.io.FileIO;
@@ -34,8 +33,10 @@ import java.nio.charset.StandardCharsets;
 
 class ReadableFileToStringDoFn extends DoFn<FileIO.ReadableFile, String> {
 
-  public static final TupleTag<String> VALIDROWS = new TupleTag<String>() {};
-  public static final TupleTag<ReadableFile> FAILEDFILES = new TupleTag<ReadableFile>() {};
+  public static final TupleTag<String> VALIDROWS = new TupleTag<String>() {
+  };
+  public static final TupleTag<ReadableFile> FAILEDFILES = new TupleTag<ReadableFile>() {
+  };
   private final Counter validRows;
   private final Counter failedFiles;
 
@@ -46,15 +47,13 @@ class ReadableFileToStringDoFn extends DoFn<FileIO.ReadableFile, String> {
 
   @ProcessElement
   public void processElement(ProcessContext context) {
-    try {
-      try (InputStream inputStream = Channels.newInputStream(context.element().open());
-          BufferedReader bufferedReader =
-              new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
-        String line;
-        while ((line = bufferedReader.readLine()) != null) {
-          this.validRows.inc();
-          context.output(VALIDROWS, line);
-        }
+    try (InputStream inputStream = Channels.newInputStream(context.element().open());
+            BufferedReader bufferedReader
+            = new BufferedReader(new InputStreamReader(inputStream, StandardCharsets.UTF_8))) {
+      String line;
+      while ((line = bufferedReader.readLine()) != null) {
+        this.validRows.inc();
+        context.output(VALIDROWS, line);
       }
     } catch (IOException e) {
       this.failedFiles.inc();

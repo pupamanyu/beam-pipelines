@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.google.api.services.bigquery.model.TableRow;
@@ -33,8 +32,10 @@ import java.nio.charset.StandardCharsets;
 
 public class JsonToTableRowDoFn extends DoFn<String, TableRow> {
 
-  public static final TupleTag<TableRow> VALIDTABLEROWS = new TupleTag<TableRow>() {};
-  public static final TupleTag<String> INVALIDTABLEROWS = new TupleTag<String>() {};
+  public static final TupleTag<TableRow> VALIDTABLEROWS = new TupleTag<TableRow>() {
+  };
+  public static final TupleTag<String> INVALIDTABLEROWS = new TupleTag<String>() {
+  };
   private final Counter validTableRows;
   private final Counter invalidTableRows;
 
@@ -46,8 +47,8 @@ public class JsonToTableRowDoFn extends DoFn<String, TableRow> {
   @ProcessElement
   public void processElement(ProcessContext context) {
     try {
-      try (InputStream inputStream =
-          new ByteArrayInputStream(context.element().getBytes(StandardCharsets.UTF_8))) {
+      try (InputStream inputStream
+              = new ByteArrayInputStream(context.element().getBytes(StandardCharsets.UTF_8))) {
         //noinspection deprecation
         context.output(TableRowJsonCoder.of().decode(inputStream, Coder.Context.OUTER));
         this.validTableRows.inc();

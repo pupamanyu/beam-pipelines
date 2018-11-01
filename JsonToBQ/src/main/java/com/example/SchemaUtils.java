@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.google.api.services.bigquery.model.TableFieldSchema;
@@ -28,8 +27,6 @@ import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
 import com.google.gson.JsonDeserializer;
 import org.apache.beam.sdk.io.FileSystems;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -43,23 +40,21 @@ import static com.google.cloud.bigquery.StandardSQLTypeName.valueOf;
 
 public class SchemaUtils {
 
-  private static final Logger LOG = LoggerFactory.getLogger(SchemaUtils.class);
-
   private static Gson getGson() {
-    JsonDeserializer<StandardSQLTypeName> typeDeserializer =
-        (jsonElement, type, deserializationContext) -> valueOf(jsonElement.getAsString());
+    JsonDeserializer<StandardSQLTypeName> typeDeserializer
+            = (jsonElement, type, deserializationContext) -> valueOf(jsonElement.getAsString());
 
-    JsonDeserializer<FieldList> subFieldsDeserializer =
-        (jsonElement, type, deserializationContext) -> {
-          Field[] fields =
-              deserializationContext.deserialize(jsonElement.getAsJsonArray(), Field[].class);
-          return FieldList.of(fields);
-        };
+    JsonDeserializer<FieldList> subFieldsDeserializer
+            = (jsonElement, type, deserializationContext) -> {
+              Field[] fields
+              = deserializationContext.deserialize(jsonElement.getAsJsonArray(), Field[].class);
+              return FieldList.of(fields);
+            };
 
     return new GsonBuilder()
-        .registerTypeAdapter(StandardSQLTypeName.class, typeDeserializer)
-        .registerTypeAdapter(FieldList.class, subFieldsDeserializer)
-        .create();
+            .registerTypeAdapter(StandardSQLTypeName.class, typeDeserializer)
+            .registerTypeAdapter(FieldList.class, subFieldsDeserializer)
+            .create();
   }
 
   static TableSchema getTableSchema(String schema) {

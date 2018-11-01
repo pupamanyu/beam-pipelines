@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -32,52 +31,103 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
+import java.util.Map;
+import java.util.HashMap;
+import java.util.Iterator;
 
 public class TransformJsonDoFn extends DoFn<String, String> {
 
-  public static final TupleTag<String> XFORM_SUCCESS = new TupleTag<String>() {};
-  public static final TupleTag<String> XFORM_FAILED = new TupleTag<String>() {};
+  public static final TupleTag<String> XFORM_SUCCESS = new TupleTag<String>() {
+  };
+  public static final TupleTag<String> XFORM_FAILED = new TupleTag<String>() {
+  };
   private static final Logger LOG = LoggerFactory.getLogger(TransformJsonDoFn.class);
   private final Counter xformSuccess;
   private final Counter jsonParseErrors;
   private final ObjectMapper objectMapper;
   private SimpleDateFormat DATE_FORMAT;
-  private ValueProvider<String> timestampColumn;
-  private ValueProvider<String> partitionColumn;
-  private ValueProvider<String> dateFormat;
+  private final ValueProvider<String> timestampColumn;
+  private final ValueProvider<String> partitionColumn;
+  private final ValueProvider<String> dateFormat;
   private String timestampField;
   private String partitionField;
+  private final Boolean sanitizeJson;
+  private final Boolean stringifyCustomData;
+  private final String customDataField;
 
   public TransformJsonDoFn(
-      ValueProvider<String> timestampColumn,
-      ValueProvider<String> partitionColumn,
-      ValueProvider<String> dateFormat) {
+          ValueProvider<String> timestampColumn,
+          ValueProvider<String> partitionColumn,
+          ValueProvider<String> dateFormat,
+          ValueProvider<Boolean> sanitizeJson,
+          ValueProvider<Boolean> stringifyCustomData,
+          ValueProvider<String> customDataField) {
     this.jsonParseErrors = Metrics.counter(TransformJsonDoFn.class, "jsonparse-error-counts");
     this.xformSuccess = Metrics.counter(TransformJsonDoFn.class, "successful-transform-counts");
     this.timestampColumn = timestampColumn;
     this.partitionColumn = partitionColumn;
     this.dateFormat = dateFormat;
     this.objectMapper = new ObjectMapper();
+    this.sanitizeJson = sanitizeJson.get();
+    this.stringifyCustomData = stringifyCustomData.get();
+    this.customDataField = customDataField.get();
+  }
+
+  static String sanitizeString(String str) {
+    return str.replace(": ", "_").replace(".", "_").replace(" ", "_");
+  }
+
+  static JsonNode sanitizePropertyNames(JsonNode json) {
+    Map<String, JsonNode> toBeSanitized = new HashMap<>();
+    Map<String, JsonNode> objects = new HashMap<>();
+    Iterator<Map.Entry<String, JsonNode>> iter = json.fields();
+    while (iter.hasNext()) {
+      Map.Entry<String, JsonNode> elt = iter.next();
+      if (elt.getValue().isObject()) {
+        JsonNode sanitized = sanitizePropertyNames(elt.getValue());
+        objects.put(elt.getKey(), sanitized);
+      } else if (!elt.getValue().isArray()) {
+        if (elt.getKey().contains(": ") || elt.getKey().contains(".") || elt.getKey().contains(" ")) {
+          toBeSanitized.put(elt.getKey(), null);
+        }
+      }
+    }
+    ObjectNode objNode = (ObjectNode) json;
+    for (String key : toBeSanitized.keySet()) {
+      objNode.set(sanitizeString(key), toBeSanitized.get(key) == null ? objNode.get(key) : toBeSanitized.get(key));
+      objNode.remove(key);
+    }
+    for (String key : objects.keySet()) {
+      objNode.set(sanitizeString(key), toBeSanitized.get(key) == null ? objNode.get(key) : toBeSanitized.get(key));
+    }
+    return objNode;
   }
 
   private JsonNode insertTimestampPartition(JsonNode jsonNode) {
     if (jsonNode.has(this.timestampField)) {
-      jsonNode =
-          ((ObjectNode) jsonNode)
-              .put(
-                  this.partitionField,
-                  DATE_FORMAT.format(new Date(jsonNode.get(this.timestampField).asLong())));
+      jsonNode
+              = ((ObjectNode) jsonNode)
+                      .put(
+                              this.partitionField,
+                              DATE_FORMAT.format(new Date(jsonNode.get(this.timestampField).asLong())));
     } else {
       LOG.error(
-          "The Input Data does not contain the Specified Timestamp Column {}. Load Job will fail",
-          this.timestampColumn);
+              "The Input Data does not contain the Specified Timestamp Column {}. Load Job will fail",
+              this.timestampColumn);
     }
     return jsonNode;
   }
 
+  static JsonNode stringifyCustomData(JsonNode json, String customPropertyName) {
+    ObjectNode objNode = (ObjectNode) json;
+    if (objNode.has(customPropertyName)) {
+      objNode.put(customPropertyName, objNode.get(customPropertyName).toString());
+    }
+    return objNode;
+  }
+
   @StartBundle
   public void startBundle(StartBundleContext startBundleContext) {
-    this.DATE_FORMAT = new SimpleDateFormat(dateFormat.get());
     this.timestampField = this.timestampColumn.get();
     this.partitionField = this.partitionColumn.get();
     this.DATE_FORMAT = new SimpleDateFormat(dateFormat.get());
@@ -89,6 +139,12 @@ public class TransformJsonDoFn extends DoFn<String, String> {
       JsonNode jsonNode = objectMapper.readTree(context.element());
       // Insert Timestamp Partition Column Field
       jsonNode = insertTimestampPartition(jsonNode);
+      if (sanitizeJson) {
+        jsonNode = sanitizePropertyNames(jsonNode);
+      }
+      if (stringifyCustomData) {
+        jsonNode = stringifyCustomData(jsonNode, this.customDataField);
+      }
       // Emit the Transformed Output
       context.output(XFORM_SUCCESS, jsonNode.toString());
       this.xformSuccess.inc();

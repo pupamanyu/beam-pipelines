@@ -47,6 +47,20 @@ PARTITIONCOLUMNDATEFORMAT="yyyy-MM-dd"
 # Comma Separated of PII Fields
 SENSITIVEFIELDS="<field1>,<field2>,..."
 GEOROOTFIELDNAME="<root field name for the geo object>"
+# INCLUDEFIELDS appiles only for Fixed Schema Custom Data
+INCLUDEFIELDS="<fieldN>,<fieldM>"
+# Custom Data Type
+# Universe of all possible custom data types
+VALID_CUSTOM_DATATYPES="<datatypename1>,<datatypename2>"
+# In case of defined customized data types
+CUSTOMDATATYPE_FIELDSELECTOR="<fieldT>"
+# In case of defined customized data types
+CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR="<fieldR>"
+# List of the available data types to search using the field selector
+CUSTOMDATATYPE="<datatypename1>"
+# EXCLUDEFIELDS applies only for Variable Schema Custom Data where data properties maybe loaded as Strings
+#EXCLUDEFIELDS=""
+SANITIZE_JSON="true"
 
 java \
   -jar ${JOBJAR} \
@@ -72,4 +86,10 @@ java \
   --tempLocation=${TEMPDIRECTORY} \
   --stagingLocation=${STAGINGDIRECTORY} \
   --runner=${RUNNER} \
-  --jobTagPrefix=${JOBTAGPREFIX}
+  --jobTagPrefix=${JOBTAGPREFIX} \
+  --validCustomDataTypes=${VALID_CUSTOM_DATATYPES} \
+  --customDataTypeFieldSelector=${CUSTOMDATATYPE_FIELDSELECTOR} \
+  --customDataTypeExcludingFieldSelector=${CUSTOMDATATYPE_EXCLUDING_FIELDSELECTOR} \
+  --customDataType=${CUSTOMDATATYPE} \
+  --sanitizeJson=${SANITIZE_JSON} \
+  --filterCustomFields=${INCLUDEFIELDS}

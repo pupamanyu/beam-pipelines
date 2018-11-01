@@ -14,8 +14,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-*/
-
+ */
 package com.example;
 
 import org.apache.beam.runners.dataflow.options.DataflowPipelineOptions;
@@ -28,7 +27,7 @@ import org.apache.beam.sdk.options.Validation;
 import org.apache.beam.sdk.options.ValueProvider;
 
 public interface Options
-    extends ApplicationNameOptions, PipelineOptions, DataflowPipelineOptions, BigQueryOptions {
+        extends ApplicationNameOptions, PipelineOptions, DataflowPipelineOptions, BigQueryOptions {
 
   @Description("Input Directory")
   @Validation.Required
@@ -61,10 +60,10 @@ public interface Options
   void setJobTagPrefix(ValueProvider<String> value);
 
   /* TODO: Make this more generic prefix */
-  /*(Needs to be DATE, TIMESTAMP since it is used for Partitioning)
+ /*(Needs to be DATE, TIMESTAMP since it is used for Partitioning)
    */
   @Description(
-      "Comma Separated List of Prefixes with values in the format YYYY-mm-dd. This is used to create file pattern")
+          "Comma Separated List of Prefixes with values in the format YYYY-mm-dd. This is used to create file pattern")
   @Validation.Required
   ValueProvider<String> getInputPrefixes();
 
@@ -101,7 +100,7 @@ public interface Options
   void setErrorTablePartitionColumn(ValueProvider<String> value);
 
   @Description(
-      "Input Timestamp Field Name from which the BigQuery Partition Column value is derived")
+          "Input Timestamp Field Name from which the BigQuery Partition Column value is derived")
   @Validation.Required
   ValueProvider<String> getTimestampColumn();
 
@@ -124,4 +123,67 @@ public interface Options
   ValueProvider<String> getGeoRootFieldName();
 
   void setGeoRootFieldName(ValueProvider<String> value);
+
+  @Description(
+          "Comma Separated List of Custom Fields to Extract. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getFilterCustomFields();
+
+  void setFilterCustomFields(ValueProvider<String> value);
+
+  @Description(
+          "Comma Separated List of Excluded Custom Fields to Extract. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getExcludedFilterCustomFields();
+
+  void setExcludedFilterCustomFields(ValueProvider<String> value);
+
+  @Description(
+          "Custom Data Type can be one of valid custom datatypes. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataType();
+
+  void setCustomDataType(ValueProvider<String> value);
+
+  @Description(
+          "List of all possible custom data types. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getValidCustomDataTypes();
+
+  void setValidCustomDataTypes(ValueProvider<String> value);
+
+  @Description(
+          "Field used to clasify custom data types. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataTypeFieldSelector();
+
+  void setCustomDataTypeFieldSelector(ValueProvider<String> value);
+
+  @Description(
+          "Value used to clasify custom data types when exclusion is in place. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataTypeExcludingFieldSelectorValue();
+
+  void setCustomDataTypeExcludingFieldSelectorValue(ValueProvider<String> value);
+
+  @Description(
+          "Indicates if the pipeline should sanitize json property names, making it sure they're valid BQ column names.")
+  @Default.Boolean(false)
+  ValueProvider<Boolean> getSanitizeJson();
+
+  void setSanitizeJson(ValueProvider<Boolean> value);
+
+  @Description(
+          "Defines if the custom data portion of the information will be converted as a String. This is required for Custom Data only. Default value is not used at all")
+  @Default.Boolean(false)
+  ValueProvider<Boolean> getStringifyCustomData();
+
+  void setStringifyCustomData(ValueProvider<Boolean> value);
+
+  @Description(
+          "Name of the property that holds the custom data. This is required for Custom Data only. Default value is not used at all")
+  @Default.String("")
+  ValueProvider<String> getCustomDataField();
+
+  void setCustomDataField(ValueProvider<String> value);
 }
