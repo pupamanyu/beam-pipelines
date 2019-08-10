@@ -108,28 +108,6 @@ public class Payload implements Serializable {
     this.bundleSchemaHash = bundleSchemaHash;
   }
 
-  @Override public boolean equals(Object o) {
-    if (this == o)
-      return true;
-    if (o == null || getClass() != o.getClass())
-      return false;
-    Payload payload = (Payload) o;
-    return Objects.equal(getBundlePrefixPath(), payload.getBundlePrefixPath()) && Objects
-        .equal(getBundleSize(), payload.getBundleSize()) && Objects
-        .equal(getBundleCount(), payload.getBundleCount()) && Objects
-        .equal(getBundleProject(), payload.getBundleProject()) && Objects
-        .equal(getBundleDataset(), payload.getBundleDataset()) && Objects
-        .equal(getBundleTable(), payload.getBundleTable()) && Objects
-        .equal(getBundleSchemaVersion(), payload.getBundleSchemaVersion()) && Objects
-        .equal(getBundleSchemaHash(), payload.getBundleSchemaHash());
-  }
-
-  @Override public int hashCode() {
-    return Objects
-        .hashCode(getBundlePrefixPath(), getBundleSize(), getBundleCount(), getBundleProject(),
-            getBundleDataset(), getBundleTable(), getBundleSchemaVersion(), getBundleSchemaHash());
-  }
-
   @Override
   public String toString() {
     return "Payload{"
@@ -141,6 +119,9 @@ public class Payload implements Serializable {
         + '\''
         + ", bundleCount='"
         + bundleCount
+        + '\''
+        + ", bundleProject='"
+        + bundleProject
         + '\''
         + ", bundleDataset='"
         + bundleDataset
@@ -155,5 +136,33 @@ public class Payload implements Serializable {
         + bundleSchemaHash
         + '\''
         + '}';
+  }
+
+  @Override
+  public boolean equals(Object o) {
+    if (this == o) return true;
+    if (o == null || getClass() != o.getClass()) return false;
+    Payload payload = (Payload) o;
+    return Objects.equal(getBundlePrefixPath(), payload.getBundlePrefixPath())
+        && Objects.equal(getBundleSize(), payload.getBundleSize())
+        && Objects.equal(getBundleCount(), payload.getBundleCount())
+        && Objects.equal(getBundleProject(), payload.getBundleProject())
+        && Objects.equal(getBundleDataset(), payload.getBundleDataset())
+        && Objects.equal(getBundleTable(), payload.getBundleTable())
+        && Objects.equal(getBundleSchemaVersion(), payload.getBundleSchemaVersion())
+        && Objects.equal(getBundleSchemaHash(), payload.getBundleSchemaHash());
+  }
+
+  @Override
+  public int hashCode() {
+    return Objects.hashCode(
+        getBundlePrefixPath(),
+        getBundleSize(),
+        getBundleCount(),
+        getBundleProject(),
+        getBundleDataset(),
+        getBundleTable(),
+        getBundleSchemaVersion(),
+        getBundleSchemaHash());
   }
 }
