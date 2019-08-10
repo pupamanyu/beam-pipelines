@@ -56,9 +56,9 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setMaxRetries(ValueProvider<Integer> value);
 
-  @Description("Pending Jobs Threshold for the BQ Job Queue")
+  @Description("Concurrent Load Jobs Threshold for the BQ Job Queue(Depends on BQ Slots)")
   @Validation.Required
-  ValueProvider<Integer> getPendingJobThreshold();
+  ValueProvider<Integer> getConcurrentLoadJobsThreshold();
 
-  void setPendingJobThreshold(ValueProvider<Integer> value);
+  void setConcurrentLoadJobsThreshold(ValueProvider<Integer> value);
 }

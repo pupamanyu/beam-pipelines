@@ -30,11 +30,11 @@ import java.util.LinkedHashSet;
 public class BQLoaderDoFn extends DoFn<String, Void> {
 
   private static final BigQuery.JobListOption JOB_LIST_STATE_FILTER =
-      BigQuery.JobListOption.stateFilter(JobStatus.State.PENDING);
+      BigQuery.JobListOption.stateFilter(JobStatus.State.RUNNING);
   private static final BigQuery.JobListOption JOB_LIST_ALL_USERS_FILTER =
       BigQuery.JobListOption.allUsers();
   private static final Gson GSON = new Gson();
-  private final int pendingJobsThreshold;
+  private final int concurrentLoadJobsThreshold;
   private final FluentBackoff fluentBackoff;
   private final TupleTag<KV<String, String>> submittedLoadJobs;
   private final TupleTag<String> submittedForRetryLoadJobs;
@@ -58,21 +58,20 @@ public class BQLoaderDoFn extends DoFn<String, Void> {
             .withExponent(options.getBackOffExponential().get())
             .withMaxRetries(options.getMaxRetries().get())
             .withInitialBackoff(Duration.standardSeconds(options.getInitialBackOffSeconds().get()));
-    this.pendingJobsThreshold = options.getPendingJobThreshold().get();
+    this.concurrentLoadJobsThreshold = options.getConcurrentLoadJobsThreshold().get();
     this.submittedLoadJobs = submittedLoadJobs;
     this.submittedForRetryLoadJobs = submittedForRetryLoadJobs;
   }
 
-  private void isQueueUnderThreshold() throws PendingQueueException {
-    LinkedHashSet<JobId> pendingJobs = new LinkedHashSet<JobId>();
+  private void isQueueUnderThreshold() throws JobsThresholdException {
+    LinkedHashSet<JobId> concurrentLoadJobs = new LinkedHashSet<JobId>();
     Page<Job> jobs = this.bigQuery.listJobs(JOB_LIST_STATE_FILTER, JOB_LIST_ALL_USERS_FILTER);
     for (Job job : jobs.iterateAll()) {
-      pendingJobs.add(job.getJobId());
+      concurrentLoadJobs.add(job.getJobId());
     }
-    boolean queueUnderThreshold = pendingJobs.size() < this.pendingJobsThreshold;
-    if (!queueUnderThreshold) {
-      throw new PendingQueueException(
-          "BQ Job Queue is beyond the set threshold of " + this.pendingJobsThreshold);
+    if (!(concurrentLoadJobs.size() < this.concurrentLoadJobsThreshold)) {
+      throw new JobsThresholdException(
+          "BQ Job Queue is beyond the set threshold of " + this.concurrentLoadJobsThreshold);
     }
   }
 
@@ -91,7 +90,7 @@ public class BQLoaderDoFn extends DoFn<String, Void> {
     return loadJobConfigurationBuilder.build();
   }
 
-  private JobId submitJob(TableId destinationTableId, String sourceUri)
+  private Job submitJob(TableId destinationTableId, String sourceUri)
       throws BigQueryException, IOException, InterruptedException, BackOffExhaustedException {
     Job job = null;
     LoadJobConfiguration loadJobConfiguration =
@@ -102,8 +101,8 @@ public class BQLoaderDoFn extends DoFn<String, Void> {
       try {
         isQueueUnderThreshold();
         job = bigQuery.create(JobInfo.of(loadJobConfiguration));
-        return job.getJobId();
-      } catch (PendingQueueException q) {
+        return job;
+      } catch (JobsThresholdException q) {
         if (!BackOffUtils.next(sleeper, backOff)) {
           /*
            * Failed to get the Open Spot in the Load Job Queue.
@@ -131,15 +130,14 @@ public class BQLoaderDoFn extends DoFn<String, Void> {
     String bundleTable = loadRequest.payload.bundleTable;
     String bundleProject = loadRequest.payload.bundleProject;
     try {
-      JobId jobId =
-          submitJob(TableId.of(bundleProject, bundleDataset, bundleTable), bundlePrefixPath);
+      Job job = submitJob(TableId.of(bundleProject, bundleDataset, bundleTable), bundlePrefixPath);
       this.submittedCount.inc();
-      /*
+      /* Load Job Submitted Successfully
        * Send the KV<JobId, String> to be processed for state db insertions
        * We need to insert JobId along with input Load Request JSON with possibly other metadata
        * Can feed the State DB Load Job Injector using TupleTag loadJobStateData TupleTag
        */
-      context.output(this.submittedLoadJobs, KV.of(jobId.toString(), context.element()));
+      context.output(this.submittedLoadJobs, KV.of(job.getJobId().toString(), context.element()));
     } catch (BigQueryException e) {
       /*
        * Something bad happened while submitting Load job to BQ
@@ -153,7 +151,7 @@ public class BQLoaderDoFn extends DoFn<String, Void> {
       context.output(this.submittedForRetryLoadJobs, context.element());
     } catch (BackOffExhaustedException e) {
       /*
-       * Pending Jobs in the BQ Load Queue is beyond the threshold
+       * Concurrent Jobs in the BQ Load Queue is beyond the threshold
        * Divert the Incoming PubSub to Source PubSub for retry later
        * Use TupleTag with submittedForRetryLoadJobs Tag
        * Increment Counters

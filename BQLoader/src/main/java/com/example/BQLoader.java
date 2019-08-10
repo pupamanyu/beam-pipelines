@@ -32,7 +32,7 @@ public class BQLoader {
                         TupleTagList.of(submittedLoadJobs).and(submittedForRetryLoadJobs)));
 
     /*
-     * Extract Submitted Job State Data
+     * Extract Successfully Submitted Job State Data
      * TODO: Need to Implement Sink for State DB(BigTable or another Key Value Store)
      *  pCollectionTuple.get(submittedLoadJobs);
      */
@@ -43,7 +43,7 @@ public class BQLoader {
     pCollectionTuple
         .get(submittedForRetryLoadJobs)
         .apply(
-            "Inject Pending Load Requests to Source Queue",
+            "Inject Load Requests to Source Queue",
             PubsubIO.writeStrings().to(options.getSourceTopic().get()));
 
     p.run();
