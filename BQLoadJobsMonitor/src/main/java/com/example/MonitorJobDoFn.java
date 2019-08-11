@@ -1,11 +1,12 @@
 package com.example;
 
 import com.google.cloud.bigquery.BigQuery;
-import com.google.cloud.bigquery.BigQueryException;
 import com.google.cloud.bigquery.BigQueryOptions;
 import com.google.cloud.bigquery.Job;
 import com.google.cloud.bigquery.JobStatistics;
 import com.google.cloud.bigquery.JobStatus;
+import com.google.gson.Gson;
+import org.apache.beam.sdk.io.gcp.pubsub.PubsubMessage;
 import org.apache.beam.sdk.metrics.Counter;
 import org.apache.beam.sdk.metrics.Distribution;
 import org.apache.beam.sdk.metrics.Metrics;
@@ -20,13 +21,17 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import java.io.IOException;
+import java.nio.charset.StandardCharsets;
+import java.time.Instant;
+import java.util.Map;
 
-public class MonitorJobDoFn extends DoFn<String, Void> {
+public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
 
   private static final Logger LOG = LoggerFactory.getLogger(MonitorJobDoFn.class);
+  private static final Gson GSON = new Gson();
   private static final BigQuery bigQuery = BigQueryOptions.getDefaultInstance().getService();
   private final FluentBackoff fluentBackoff;
-  private final TupleTag<String> pushedBackForMonitoring;
+  private final TupleTag<PubsubMessage> pushedBackForMonitoring;
   private Counter backOffExhaustedCount =
       Metrics.counter(MonitorJobDoFn.class, "backoff-exhausted");
   private Counter backOffInterruptedCount =
@@ -43,7 +48,7 @@ public class MonitorJobDoFn extends DoFn<String, Void> {
   private Distribution jobTotalLatencyMs =
       Metrics.distribution(MonitorJobDoFn.class, "job-total-latency-ms");
 
-  MonitorJobDoFn(Options options, TupleTag<String> pushedBackForMonitoring) {
+  MonitorJobDoFn(Options options, TupleTag<PubsubMessage> pushedBackForMonitoring) {
     /*
      * We are using Fluent BackOff so as to retry checking for Job in Running State
      * with an expectation that it may finish within BackOff expiry
@@ -78,22 +83,21 @@ public class MonitorJobDoFn extends DoFn<String, Void> {
     }
   }
 
-  private void hasJobTransitionedToState(Job job, JobStatus.State toJobState)
-      throws JobNotYetDoneException {
-    if (job.getStatus().getState() != toJobState) {
+  private void isLoadJobDone(Job job) throws JobNotYetDoneException {
+    if (job.getStatus().getState() != JobStatus.State.DONE) {
       throw new JobNotYetDoneException(
           "BQ Job "
               + job.getJobId()
               + " has not transitioned from "
               + job.getStatus().getState()
               + " to "
-              + toJobState
-              + " yet.");
+              + JobStatus.State.DONE
+              + " state yet.");
     }
   }
 
   private Job hasJobCompleted(String jobId)
-      throws BigQueryException, IOException, InterruptedException, BackOffExhaustedException {
+      throws IOException, InterruptedException, BackOffExhaustedException {
     Sleeper sleeper = Sleeper.DEFAULT;
     BackOff backOff = this.fluentBackoff.backoff();
     while (true) {
@@ -106,7 +110,7 @@ public class MonitorJobDoFn extends DoFn<String, Void> {
                     BigQuery.JobField.STATUS,
                     BigQuery.JobField.CONFIGURATION,
                     BigQuery.JobField.STATISTICS));
-        hasJobTransitionedToState(job, JobStatus.State.DONE);
+        isLoadJobDone(job);
         return job;
       } catch (JobNotYetDoneException j) {
         if (!BackOffUtils.next(sleeper, backOff)) {
@@ -130,20 +134,59 @@ public class MonitorJobDoFn extends DoFn<String, Void> {
 
   @ProcessElement
   public void processElement(ProcessContext context) {
-    String jobId = context.element();
+    LoadRequest loadRequest =
+        GSON.fromJson(
+            new String(context.element().getPayload(), StandardCharsets.UTF_8), LoadRequest.class);
+    Map<String, String> messageAttributes = context.element().getAttributeMap();
+    String jobId = messageAttributes.get("jobId");
     try {
       /*
        * Check if the Job is in DONE State
        */
+      messageAttributes.putIfAbsent(
+          "jobMonitoringStartTimeMs", String.valueOf(Instant.now().toEpochMilli()));
       Job job = this.hasJobCompleted(jobId);
       /*
        * Job is in DONE State
        */
       this.processCompletedJob(job);
       /*
-       * TODO: Update Job State, Job Statistics, Errors(if any) inside State Management
+       * Add Job Monitoring Stats as PubSub attributes or Update State Management Store
        */
+      messageAttributes.putIfAbsent(
+          "jobMonitoringEndTimeMs", String.valueOf(Instant.now().toEpochMilli()));
+      String jobMonitoringTotalTimeMs =
+          String.valueOf(
+              Integer.parseInt(messageAttributes.get("jobMonitoringEndTimeMs"))
+                  + Integer.parseInt(messageAttributes.get("jobMonitoringStartTimeMs")));
+      messageAttributes.putIfAbsent("jobMonitoringTotalTimeMs", jobMonitoringTotalTimeMs);
+      messageAttributes.putIfAbsent("jobCompleted", "true");
 
+      /*
+       * TODO: Update Job State, Job Statistics, Errors(if any) inside State Management Store
+       */
+      long jobStartTime = job.getStatistics().getStartTime();
+      long jobCreatedTime = job.getStatistics().getCreationTime();
+      long jobEndTime = job.getStatistics().getEndTime();
+      messageAttributes.putIfAbsent(
+          "jobAwaitingToRunLatencyMs", String.valueOf(jobStartTime - jobCreatedTime));
+      messageAttributes.putIfAbsent("jobRunLatencyMs", String.valueOf(jobEndTime - jobStartTime));
+      messageAttributes.putIfAbsent(
+          "jobTotalLatencyMs",
+          String.valueOf((jobStartTime - jobCreatedTime) + (jobEndTime - jobStartTime)));
+      if (job.getStatus().getError() != null) {
+        /*
+         * TODO: Job has not succeeded. Capture Error details and update state
+         *  The size of Error Message and Error Reason may be large to fit
+         *  Inside PubSub Attributes
+         *  For eg:
+         *  messageAttributes.putIfAbsent("errorMessage", job.getStatus().getError().getMessage());
+         *  messageAttributes.putIfAbsent("errorReason", job.getStatus().getError().getReason());
+         */
+        messageAttributes.putIfAbsent("jobSuccessful", "false");
+      } else {
+        messageAttributes.putIfAbsent("jobSuccessful", "true");
+      }
       /*
        * Send main output which is PCollection<Void> for Trivial Sink
        */
@@ -154,21 +197,37 @@ public class MonitorJobDoFn extends DoFn<String, Void> {
        * Job is either in Pending State or in Running State
        * Divert the incoming PubSub to Source PubSub for retry later
        * Use TupleTag with pushedBackForMonitoringJobs Tag
-       * Increment Counters
+       * Increment Counters, Increment pushedBackForMonitoringRetries Attribute value
        */
+      messageAttributes.put(
+          "pushedBackForMonitoringRetries",
+          String.valueOf(
+              Integer.parseInt(
+                      messageAttributes.getOrDefault("pushedBackForMonitoringRetries", "1"))
+                  + 1));
       this.backOffExhaustedCount.inc();
       this.submittedForRetryCount.inc();
-      context.output(this.pushedBackForMonitoring, context.element());
+      context.output(
+          this.pushedBackForMonitoring,
+          new PubsubMessage(context.element().getPayload(), messageAttributes));
     } catch (IOException | InterruptedException e) {
       /*
        * Something bad happened during BackOff(Perhaps BackOff was interrupted)
        * Divert the incoming PubSub to Source PubSub for retry later
        * Use TupleTag with pushedBackForMonitoringJobs Tag
-       * Increment Counters
+       * Increment Counters, Increment pushedBackForMonitoringRetries Attribute value
        */
+      messageAttributes.put(
+          "pushedBackForMonitoringRetries",
+          String.valueOf(
+              Integer.parseInt(
+                      messageAttributes.getOrDefault("pushedBackForMonitoringRetries", "1"))
+                  + 1));
       this.backOffInterruptedCount.inc();
       this.submittedForRetryCount.inc();
-      context.output(this.pushedBackForMonitoring, context.element());
+      context.output(
+          this.pushedBackForMonitoring,
+          new PubsubMessage(context.element().getPayload(), messageAttributes));
     }
   }
 }
