@@ -40,20 +40,9 @@ sourceCompatibility = 1.8
 targetCompatibility = 1.8
 compileJava.options.compilerArgs.add("-Xlint:unchecked")
 
-/*
-distributions {
-    main {
-        contents {
-            from jar
-        }
-    }
-}
-*/
-
-
 jar {
     manifest {
-        attributes('Main-Class': 'com.example.BundleFiles')
+        attributes('Main-Class': 'com.example.BQLoader')
     }
 }
 

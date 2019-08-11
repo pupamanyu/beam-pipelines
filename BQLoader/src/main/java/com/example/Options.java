@@ -20,6 +20,12 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setSourceTopic(ValueProvider<String> value);
 
+  @Description("Target PubSub Topic for Pushing Submitted Jobs for Monitoring")
+  @Validation.Required
+  ValueProvider<String> getJobMonitoringTopic();
+
+  void setJobMonitoringTopic(ValueProvider<String> value);
+
   @Description("BQ Project Name")
   @Validation.Required
   ValueProvider<String> getBQProject();
@@ -61,4 +67,11 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
   ValueProvider<Integer> getConcurrentLoadJobsThreshold();
 
   void setConcurrentLoadJobsThreshold(ValueProvider<Integer> value);
+
+  @Description(
+      "Concurrent Load Jobs Cache TTL in minutes. This is used to reduce number of calls to List Running BQ Jobs")
+  @Validation.Required
+  ValueProvider<Integer> getConcurrentLoadJobsCacheTTLMinutes();
+
+  void setConcurrentLoadJobsCacheTTLMinutes(ValueProvider<Integer> value);
 }
