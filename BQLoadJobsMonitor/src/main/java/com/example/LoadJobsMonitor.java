@@ -41,6 +41,11 @@ public class LoadJobsMonitor {
             PubsubIO.writeMessages()
                 .to(options.getSourceTopic().get())
                 .withIdAttribute(options.getDeDupId().get()));
+    /*
+     * Trivial Sink for Main Output(PCollection<Void>)
+     */
     pCollectionTuple.get(voidTupleTag).apply(new MonitorTrivialSink());
+
+    p.run();
   }
 }
