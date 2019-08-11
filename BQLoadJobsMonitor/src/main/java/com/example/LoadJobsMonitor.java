@@ -23,8 +23,7 @@ public class LoadJobsMonitor {
         p.apply(
                 "Consume BQ Load Jobs to be Monitored",
                 PubsubIO.readMessagesWithAttributes()
-                    .fromSubscription(options.getSourceSubscription())
-                    .withIdAttribute(options.getDeDupId().get()))
+                    .fromSubscription(options.getSourceSubscription()))
             .apply(
                 "Monitor BQ Load Jobs",
                 ParDo.of(new MonitorJobDoFn(options, pushedBackForMonitoring))
@@ -32,7 +31,7 @@ public class LoadJobsMonitor {
 
     /*
      * Resubmit Jobs for Monitoring post Back Off Exhaustion
-     * 
+     *
      */
     pCollectionTuple
         .get(pushedBackForMonitoring)
