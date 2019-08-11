@@ -32,15 +32,14 @@ public class LoadJobsMonitor {
 
     /*
      * Resubmit Jobs for Monitoring post Back Off Exhaustion
-     * with DeDup Attribute Set for each of the PubSub Message
+     * 
      */
     pCollectionTuple
         .get(pushedBackForMonitoring)
         .apply(
             "Push Back BQ Load Jobs for Monitoring",
             PubsubIO.writeMessages()
-                .to(options.getSourceTopic().get())
-                .withIdAttribute(options.getDeDupId().get()));
+                .to(options.getSourceTopic().get()));
     /*
      * Trivial Sink for Main Output(PCollection<Void>)
      */
