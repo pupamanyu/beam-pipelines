@@ -51,7 +51,7 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
   private final String targetBQProject;
   private final int concurrentLoadJobsThreshold;
   private final int loadJobsCacheTTLMinutes;
-  private final int loadJobSubmissionRetries;
+  private final int MaxLoadJobRetryCycles;
   private final FluentBackoff fluentBackoff;
   private final TupleTag<PubsubMessage> submittedLoadJobs;
   private final TupleTag<PubsubMessage> submittedForRetryLoadJobs;
@@ -84,7 +84,7 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
             .withInitialBackoff(Duration.standardSeconds(options.getInitialBackOffSeconds().get()));
     this.concurrentLoadJobsThreshold = options.getConcurrentLoadJobsThreshold().get();
     this.loadJobsCacheTTLMinutes = options.getConcurrentLoadJobsCacheTTLMinutes().get();
-    this.loadJobSubmissionRetries = options.getLoadJobSubmissionRetries().get();
+    this.MaxLoadJobRetryCycles = options.getMaxLoadJobRetryCycles().get();
     this.targetBQProject = options.getBQProject().get();
     this.submittedLoadJobs = submittedLoadJobs;
     this.submittedForRetryLoadJobs = submittedForRetryLoadJobs;
@@ -188,21 +188,31 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
     String bundleTable = loadRequest.payload.bundleTable;
     /*
      * Set retriesUntilNow attribute to 0 if not present
-     * This indicates this is a newly requested Job as opposed the one
-     * submitted for Retry
+     * This indicates that the LoadRequest is not attempted for submission yet as opposed to the ones
+     * going through the Retry loop
      */
     int retriesUntilNow =
-        Integer.parseInt(messageAttributes.getOrDefault("loadJobSubmissionRetries", "0"));
-    if (retriesUntilNow < this.loadJobSubmissionRetries) {
+        Integer.parseInt(messageAttributes.getOrDefault("loadJobSubmissionAttempts", "0"));
+    if (retriesUntilNow < this.MaxLoadJobRetryCycles) {
+      /*
+       * MaxLoadJobRetryCycles is a pressure valve. MaxLoadJobRetryCycles needs to be set to a higher value(>= 10000) to avoid
+       * triggering False Negatives. If we are unable to submit a job after passing
+       * through the Source PubSub Queue for MaxLoadJobRetryCycles times with an
+       * exponential BackOff every cycle,
+       * then either something is wrong with BQ Service, Current running jobs have not finished, or
+       * BQ Concurrent Job count has not dropped to provide a free spot for this
+       * job in question. We need to then take action like offloading the LoadRequest
+       * to GCS deadLetter for manual intervention than to endlessly attempt submission.
+       */
       if (retriesUntilNow > 0) {
         /*
-         * The Load Job is back for Submission(Retry).
+         * The Load Job was attempted for submission earlier. It is back for Submission(Retry).
          * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
          */
         messageAttributes.put(
-            "loadJobSubmissionRetries",
+            "loadJobSubmissionAttempts",
             String.valueOf(
-                Integer.parseInt(messageAttributes.get("loadJobSubmissionRetries")) + 1));
+                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
       }
       try {
         Job job =

@@ -89,11 +89,11 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
   void setConcurrentLoadJobsCacheTTLMinutes(ValueProvider<Integer> value);
 
   @Description(
-      "Load Job Submission Retries. This is used to determine the maximum amount of attempts for the Load Request to go through retry cycle before considering it for manual inspection")
-  @Validation.Required
-  ValueProvider<Integer> getLoadJobSubmissionRetries();
+      "Load Job Submission Retries through the Retry Cycle. This acts as pressure valve. Set this to a higher number(like > 10000). Lower number may cause false negatives. This is used to determine the maximum amount of attempts for the Load Request to go through retry cycle(Source PubSub) before considering the Load Request for manual inspection")
+  @Default.Integer(10000)
+  ValueProvider<Integer> getMaxLoadJobRetryCycles();
 
-  void setLoadJobSubmissionRetries(ValueProvider<Integer> value);
+  void setMaxLoadJobRetryCycles(ValueProvider<Integer> value);
 
   @Description(
       "Dead Letter GCS Bucket Name without gs:// for Saving Failed Load Requests after specified maximum job submission attempts")
