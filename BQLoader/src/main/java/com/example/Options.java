@@ -45,18 +45,6 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setBQProject(ValueProvider<String> value);
 
-  @Description("BQ DataSet Name")
-  @Validation.Required
-  ValueProvider<String> getDataSet();
-
-  void setDataSet(ValueProvider<String> value);
-
-  @Description("BQ Table Name")
-  @Validation.Required
-  ValueProvider<String> getTableName();
-
-  void setTableName(ValueProvider<String> value);
-
   @Description("Initial BackOff in Seconds for checking BQ Job Queue")
   @Validation.Required
   ValueProvider<Integer> getInitialBackOffSeconds();
