@@ -58,13 +58,13 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
   private final TupleTag<String> failedSubmissionLoadJobs;
   private Counter submittedCount = Metrics.counter(BQLoaderDoFn.class, "submittedCount");
   private Counter backOffExhaustedCount =
-      Metrics.counter(BQLoaderDoFn.class, "loader-backoff-exhausted-count");
+      Metrics.counter(BQLoaderDoFn.class, "backoff-exhausted");
   private Counter bigQueryExceptionCount =
-      Metrics.counter(BQLoaderDoFn.class, "loader-bigquery-exception-count");
+      Metrics.counter(BQLoaderDoFn.class, "bigquery-exception");
   private Counter backOffInterruptedCount =
-      Metrics.counter(BQLoaderDoFn.class, "loader-backoff-interrupted-count");
+      Metrics.counter(BQLoaderDoFn.class, "backoff-interrupted");
   private Counter submittedForRetryCount =
-      Metrics.counter(BQLoaderDoFn.class, "loader-submitted-for-retry-count");
+      Metrics.counter(BQLoaderDoFn.class, "submitted-for-retry-cycles");
   private Distribution jobSubmissionLatencyMs =
       Metrics.distribution(BQLoaderDoFn.class, "load-job-submission-latency-ms");
 
@@ -193,27 +193,17 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
      */
     int retriesUntilNow =
         Integer.parseInt(messageAttributes.getOrDefault("loadJobSubmissionAttempts", "0"));
+    /*
+     * MaxLoadJobRetryCycles is a pressure valve. MaxLoadJobRetryCycles needs to be set to a higher value(>= 10000) to avoid
+     * triggering False Negatives. If we are unable to submit a job after passing
+     * through the Source PubSub Queue for MaxLoadJobRetryCycles times with an
+     * exponential BackOff every cycle,
+     * then either something is wrong with BQ Service, Current running jobs have not finished, or
+     * BQ Concurrent Job count has not dropped to provide a free spot for this
+     * job in question. We need to then take action like offloading the LoadRequest
+     * to GCS deadLetter for manual intervention than to endlessly attempt submission.
+     */
     if (retriesUntilNow < this.MaxLoadJobRetryCycles) {
-      /*
-       * MaxLoadJobRetryCycles is a pressure valve. MaxLoadJobRetryCycles needs to be set to a higher value(>= 10000) to avoid
-       * triggering False Negatives. If we are unable to submit a job after passing
-       * through the Source PubSub Queue for MaxLoadJobRetryCycles times with an
-       * exponential BackOff every cycle,
-       * then either something is wrong with BQ Service, Current running jobs have not finished, or
-       * BQ Concurrent Job count has not dropped to provide a free spot for this
-       * job in question. We need to then take action like offloading the LoadRequest
-       * to GCS deadLetter for manual intervention than to endlessly attempt submission.
-       */
-      if (retriesUntilNow > 0) {
-        /*
-         * The Load Job was attempted for submission earlier. It is back for Submission(Retry).
-         * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
-         */
-        messageAttributes.put(
-            "loadJobSubmissionAttempts",
-            String.valueOf(
-                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
-      }
       try {
         Job job =
             submitJob(
@@ -251,6 +241,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          */
         this.submittedForRetryCount.inc();
         this.bigQueryExceptionCount.inc();
+        /*
+         * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
+         * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
+         */
+        messageAttributes.put(
+            "loadJobSubmissionAttempts",
+            String.valueOf(
+                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
         messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
         context.output(
             this.submittedForRetryLoadJobs,
@@ -264,6 +262,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          */
         this.backOffExhaustedCount.inc();
         this.submittedForRetryCount.inc();
+        /*
+         * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
+         * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
+         */
+        messageAttributes.put(
+            "loadJobSubmissionAttempts",
+            String.valueOf(
+                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
         messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
         context.output(
             this.submittedForRetryLoadJobs,
@@ -276,6 +282,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          */
         this.backOffInterruptedCount.inc();
         this.submittedForRetryCount.inc();
+        /*
+         * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
+         * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
+         */
+        messageAttributes.put(
+            "loadJobSubmissionAttempts",
+            String.valueOf(
+                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
         messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
         context.output(
             this.submittedForRetryLoadJobs,
