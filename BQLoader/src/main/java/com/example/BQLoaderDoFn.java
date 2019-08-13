@@ -24,6 +24,7 @@ import org.apache.beam.sdk.util.BackOffUtils;
 import org.apache.beam.sdk.util.FluentBackoff;
 import org.apache.beam.sdk.util.Sleeper;
 import org.apache.beam.sdk.values.TupleTag;
+import org.apache.commons.lang3.ObjectUtils;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -35,6 +36,7 @@ import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.Map;
+import java.util.UUID;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -182,17 +184,16 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
     LoadRequest loadRequest =
         GSON.fromJson(
             new String(context.element().getPayload(), StandardCharsets.UTF_8), LoadRequest.class);
-    Map<String, String> messageAttributes = context.element().getAttributeMap();
-    String bundlePrefixPath = loadRequest.payload.bundlePrefixPath;
-    String bundleDataset = loadRequest.payload.bundleDataset;
-    String bundleTable = loadRequest.payload.bundleTable;
+    LoadRequestAttributes loadRequestAttributes = loadRequest.loadRequestAttributes;
+    String bundlePrefixPath = loadRequest.loadRequestPayload.bundlePrefixPath;
+    String bundleDataset = loadRequest.loadRequestPayload.bundleDataset;
+    String bundleTable = loadRequest.loadRequestPayload.bundleTable;
     /*
-     * Set retriesUntilNow attribute to 0 if not present
+     * Set submissionRetriesUntilNow attribute to 0 if not present
      * This indicates that the LoadRequest is not attempted for submission yet as opposed to the ones
      * going through the Retry loop
      */
-    int retriesUntilNow =
-        Integer.parseInt(messageAttributes.getOrDefault("loadJobSubmissionAttempts", "0"));
+    Integer submissionRetriesUntilNow = ObjectUtils.firstNonNull(loadRequestAttributes.getLoadJobSubmissionAttempts(), 0);
     /*
      * MaxLoadJobRetryCycles is a pressure valve. MaxLoadJobRetryCycles needs to be set to a higher value(>= 10000) to avoid
      * triggering False Negatives. If we are unable to submit a job after passing
@@ -203,7 +204,7 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
      * job in question. We need to then take action like offloading the LoadRequest
      * to GCS deadLetter for manual intervention than to endlessly attempt submission.
      */
-    if (retriesUntilNow < this.MaxLoadJobRetryCycles) {
+    if (submissionRetriesUntilNow < this.MaxLoadJobRetryCycles) {
       try {
         Job job =
             submitJob(
@@ -211,22 +212,29 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
         long jobSubmittedTimeMs = Instant.now().toEpochMilli();
         this.submittedCount.inc();
         /*
-         * We need to insert JobId as a PubSub Attribute
-         * with possibly other metadata.
+         * Create a LoaderEnvelope Attributes and add jobId, jobCreatedTimestamp as an attribute
          */
-        messageAttributes.put("jobId", job.getJobId().toString());
-        messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
+
+        LoaderEnvelopeAttributes loaderEnvelopeAttributes = new LoaderEnvelopeAttributes();
+        loaderEnvelopeAttributes.setJobId(job.getJobId().toString());
+        loaderEnvelopeAttributes.setJobCreatedTimestamp(job.getStatistics().getCreationTime());
         /*
          * Update the Metrics to record the Job Submission Latency(ms)
          */
         this.jobSubmissionLatencyMs.update(jobSubmittedTimeMs - loadStartTimeMs);
         /*
-         * Load Job Submitted Successfully
-         * Send the LoadRequest as a PubSub Payload for monitoring and state updates downstream
+         * Load Job Submitted Successfully hence
+         * embed loadRequest inside loaderEnvelope along with loaderEnvelopeAttributes
+         * Send the LoaderEnvelope as a PubSub Payload for monitoring and state updates downstream
          */
+        LoaderEnvelope loaderEnvelope = new LoaderEnvelope();
+        loaderEnvelope.setLoadRequest(loadRequest);
+        loaderEnvelope.setLoaderEnvelopeAttributes(loaderEnvelopeAttributes);
+        Map<String, String> loaderEnvelopeAttributesMap = new HashMap<String, String>();
+        loaderEnvelopeAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
         context.output(
             this.submittedLoadJobs,
-            new PubsubMessage(context.element().getPayload(), messageAttributes));
+            new PubsubMessage(GSON.toJson(loaderEnvelope).getBytes(StandardCharsets.UTF_8), loaderEnvelopeAttributesMap));
         /*
          * Send main output which is PCollection<Void>
          */
@@ -245,14 +253,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
          * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
          */
-        messageAttributes.put(
-            "loadJobSubmissionAttempts",
-            String.valueOf(
-                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
-        messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
+        Integer loadJobSubmissionAttempts = ObjectUtils.firstNonNull(loadRequestAttributes.getLoadJobSubmissionAttempts(), 0);
+        loadRequestAttributes.setLoadJobSubmissionAttempts(loadJobSubmissionAttempts + 1);
+        loadRequest.setLoadRequestAttributes(loadRequestAttributes);
+        Map<String, String> loadRequestAttributesMap = new HashMap<String, String>();
+        loadRequestAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
         context.output(
             this.submittedForRetryLoadJobs,
-            new PubsubMessage(context.element().getPayload(), messageAttributes));
+            new PubsubMessage(GSON.toJson(loadRequest).getBytes(StandardCharsets.UTF_8), loadRequestAttributesMap));
       } catch (BackOffExhaustedException e) {
         /*
          * Concurrent Jobs in the BQ Load Queue is beyond the threshold
@@ -266,14 +274,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
          * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
          */
-        messageAttributes.put(
-            "loadJobSubmissionAttempts",
-            String.valueOf(
-                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
-        messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
+        Integer loadJobSubmissionAttempts = ObjectUtils.firstNonNull(loadRequestAttributes.getLoadJobSubmissionAttempts(), 0);
+        loadRequestAttributes.setLoadJobSubmissionAttempts(loadJobSubmissionAttempts + 1);
+        loadRequest.setLoadRequestAttributes(loadRequestAttributes);
+        Map<String, String> loadRequestAttributesMap = new HashMap<String, String>();
+        loadRequestAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
         context.output(
             this.submittedForRetryLoadJobs,
-            new PubsubMessage(context.element().getPayload(), messageAttributes));
+            new PubsubMessage(GSON.toJson(loadRequest).getBytes(StandardCharsets.UTF_8), loadRequestAttributesMap));
       } catch (IOException | InterruptedException e) {
         /*
          * Something bad happened during BackOff(Perhaps BackOff was interrupted)
@@ -286,14 +294,14 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
          * The Load Job will be attempted for submission later. It will be back for Submission(Retry Cycle).
          * Increment the loadJobSubmissionRetries PubSub Message Attribute for tracking
          */
-        messageAttributes.put(
-            "loadJobSubmissionAttempts",
-            String.valueOf(
-                Integer.parseInt(messageAttributes.get("loadJobSubmissionAttempts")) + 1));
-        messageAttributes.putIfAbsent("bundleId", loadRequest.payload.bundleId);
+        Integer loadJobSubmissionAttempts = ObjectUtils.firstNonNull(loadRequestAttributes.getLoadJobSubmissionAttempts(), 0);
+        loadRequestAttributes.setLoadJobSubmissionAttempts(loadJobSubmissionAttempts + 1);
+        loadRequest.setLoadRequestAttributes(loadRequestAttributes);
+        Map<String, String> loadRequestAttributesMap = new HashMap<String, String>();
+        loadRequestAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
         context.output(
             this.submittedForRetryLoadJobs,
-            new PubsubMessage(context.element().getPayload(), messageAttributes));
+            new PubsubMessage(GSON.toJson(loadRequest).getBytes(StandardCharsets.UTF_8), loadRequestAttributesMap));
       }
     } else {
       /*
@@ -304,10 +312,7 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
        * for manual inspection
        *
        */
-      Map<String, Object> failedSubmissionLoadJob = new HashMap<String, Object>();
-      failedSubmissionLoadJob.put("loadRequest", loadRequest);
-      failedSubmissionLoadJob.put("messageAttributes", context.element().getAttributeMap());
-      context.output(failedSubmissionLoadJobs, GSON.toJson(failedSubmissionLoadJob));
+      context.output(failedSubmissionLoadJobs, GSON.toJson(loadRequest));
     }
   }
 }
