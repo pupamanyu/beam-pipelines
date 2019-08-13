@@ -22,7 +22,7 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
   void setSourceTopic(ValueProvider<String> value);
 
   @Description("Source PubSub DeDup Attribute for Load Requests")
-  @Validation.Required
+  @Default.String("uniqueMessageId")
   ValueProvider<String> getSourceDeDupAttribute();
 
   void setSourceDeDupAttribute(ValueProvider<String> value);
@@ -34,7 +34,7 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
   void setJobMonitoringTopic(ValueProvider<String> value);
 
   @Description("Target PubSub DeDup Attribute for Pushing Submitted Jobs for Monitoring")
-  @Validation.Required
+  @Default.String("uniqueMessageId")
   ValueProvider<String> getTargetDeDupAttribute();
 
   void setTargetDeDupAttribute(ValueProvider<String> value);

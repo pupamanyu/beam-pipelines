@@ -57,7 +57,7 @@ public class BQLoader {
         .get(submittedLoadJobs)
         .apply(
             "Feed the Pending/Running Load Jobs back for Monitoring Later",
-            PubsubIO.writeMessages().to(options.getJobMonitoringTopic().get()));
+            PubsubIO.writeMessages().to(options.getJobMonitoringTopic().get()).withIdAttribute(options.getTargetDeDupAttribute().get()));
 
     /*
      * Extract The Jobs for Retry Submission to the Source PubSub Topic
@@ -69,7 +69,7 @@ public class BQLoader {
         .get(submittedForRetryLoadJobs)
         .apply(
             "Inject Load Requests to Source Queue",
-            PubsubIO.writeMessages().to(options.getSourceTopic().get()));
+            PubsubIO.writeMessages().to(options.getSourceTopic().get()).withIdAttribute(options.getSourceDeDupAttribute().get()));
 
     /*
      * Store the Failed Load Requests into Dead Letter GCS after Allowed Max Retries
