@@ -12,30 +12,31 @@ import java.io.Serializable;
 public class LoadRequest implements Serializable {
 
   @JsonProperty("attributes")
-  public Attributes attributes;
+  public LoadRequestAttributes loadRequestAttributes;
 
   @JsonProperty("payload")
-  public Payload payload;
+  public LoadRequestPayload loadRequestPayload;
 
-  public Attributes getAttributes() {
-    return attributes;
+  public LoadRequestAttributes getLoadRequestAttributes() {
+    return loadRequestAttributes;
   }
 
-  public void setAttributes(Attributes attributes) {
-    this.attributes = attributes;
+  public void setLoadRequestAttributes(LoadRequestAttributes loadRequestAttributes) {
+    this.loadRequestAttributes = loadRequestAttributes;
   }
 
-  public Payload getPayload() {
-    return payload;
+  public LoadRequestPayload getLoadRequestPayload() {
+    return loadRequestPayload;
   }
 
-  public void setPayload(Payload payload) {
-    this.payload = payload;
+  public void setLoadRequestPayload(LoadRequestPayload loadRequestPayload) {
+    this.loadRequestPayload = loadRequestPayload;
   }
 
   @Override
   public String toString() {
-    return "LoadRequest{" + "attributes=" + attributes + ", payload=" + payload + '}';
+    return "LoadRequest{" + "attributes=" + loadRequestAttributes + ", payload=" + loadRequestPayload
+        + '}';
   }
 
   @Override
@@ -43,12 +44,12 @@ public class LoadRequest implements Serializable {
     if (this == o) return true;
     if (o == null || getClass() != o.getClass()) return false;
     LoadRequest that = (LoadRequest) o;
-    return Objects.equal(getAttributes(), that.getAttributes())
-        && Objects.equal(getPayload(), that.getPayload());
+    return Objects.equal(getLoadRequestAttributes(), that.getLoadRequestAttributes())
+        && Objects.equal(getLoadRequestPayload(), that.getLoadRequestPayload());
   }
 
   @Override
   public int hashCode() {
-    return Objects.hashCode(getAttributes(), getPayload());
+    return Objects.hashCode(getLoadRequestAttributes(), getLoadRequestPayload());
   }
 }

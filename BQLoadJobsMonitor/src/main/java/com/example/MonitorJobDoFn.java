@@ -16,6 +16,7 @@ import org.apache.beam.sdk.util.BackOffUtils;
 import org.apache.beam.sdk.util.FluentBackoff;
 import org.apache.beam.sdk.util.Sleeper;
 import org.apache.beam.sdk.values.TupleTag;
+import org.apache.commons.lang3.ObjectUtils;
 import org.joda.time.Duration;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -23,7 +24,11 @@ import org.slf4j.LoggerFactory;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.time.Instant;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
 
@@ -31,7 +36,10 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
   private static final Gson GSON = new Gson();
   private static final BigQuery bigQuery = BigQueryOptions.getDefaultInstance().getService();
   private final FluentBackoff fluentBackoff;
+  private final Integer maxLoadRequestJobFailures;
   private final TupleTag<PubsubMessage> pushedBackForMonitoring;
+  private final TupleTag<PubsubMessage> pushedBackForRetryAfterJobFailure;
+  private final TupleTag<String> failedLoadJobRequests;
   private Counter backOffExhaustedCount =
       Metrics.counter(MonitorJobDoFn.class, "backoff-exhausted");
   private Counter backOffInterruptedCount =
@@ -39,8 +47,8 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
   private Counter failedLoadJobCount = Metrics.counter(MonitorJobDoFn.class, "failed-load-jobs");
   private Counter successfulLoadJobCount =
       Metrics.counter(MonitorJobDoFn.class, "successful-load-jobs");
-  private Counter submittedForRetryCount =
-      Metrics.counter(MonitorJobDoFn.class, "submitted-for-retries");
+  private Counter submittedForMonitoringRetryCount =
+      Metrics.counter(MonitorJobDoFn.class, "submitted-for-monitoring-retries");
   private Distribution jobAwaitingToRunLatencyMs =
       Metrics.distribution(MonitorJobDoFn.class, "job-awaiting-to-run-latency-ms");
   private Distribution jobRunLatencyMs =
@@ -48,7 +56,7 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
   private Distribution jobTotalLatencyMs =
       Metrics.distribution(MonitorJobDoFn.class, "job-total-latency-ms");
 
-  MonitorJobDoFn(Options options, TupleTag<PubsubMessage> pushedBackForMonitoring) {
+  MonitorJobDoFn(Options options, TupleTag<PubsubMessage> pushedBackForMonitoring, TupleTag<PubsubMessage> pushedBackForRetryAfterJobFailure, TupleTag<String> failedLoadJobRequests) {
     /*
      * We are using Fluent BackOff so as to retry checking for Job in Running State
      * with an expectation that it may finish within BackOff expiry
@@ -58,7 +66,10 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
             .withExponent(options.getBackOffExponential().get())
             .withMaxRetries(options.getMaxRetries().get())
             .withInitialBackoff(Duration.standardSeconds(options.getInitialBackOffSeconds().get()));
+    this.maxLoadRequestJobFailures = options.getMaxLoadRequestJobFailures().get();
     this.pushedBackForMonitoring = pushedBackForMonitoring;
+    this.pushedBackForRetryAfterJobFailure = pushedBackForRetryAfterJobFailure;
+    this.failedLoadJobRequests = failedLoadJobRequests;
   }
 
   private void updatePipelineMetrics(Job job) {
@@ -125,7 +136,7 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
     }
   }
 
-  private void processCompletedJob(Job job) {
+  private void updateCompletedJobMetrics(Job job) {
     /*
      * Update Pipeline Metrics
      */
@@ -134,33 +145,29 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
 
   @ProcessElement
   public void processElement(ProcessContext context) {
-    LoadRequest loadRequest =
+    LoaderEnvelope loaderEnvelope =
         GSON.fromJson(
-            new String(context.element().getPayload(), StandardCharsets.UTF_8), LoadRequest.class);
-    Map<String, String> messageAttributes = context.element().getAttributeMap();
-    String jobId = messageAttributes.get("jobId");
+            new String(context.element().getPayload(), StandardCharsets.UTF_8), LoaderEnvelope.class);
+
+    String jobId = loaderEnvelope.loaderEnvelopeAttributes.getJobId();
     try {
       /*
        * Check if the Job is in DONE State
        */
-      messageAttributes.putIfAbsent(
-          "jobMonitoringStartTimeMs", String.valueOf(Instant.now().toEpochMilli()));
+      loaderEnvelope.loaderEnvelopeAttributes.setJobCreatedTimestamp(ObjectUtils.firstNonNull(loaderEnvelope.loaderEnvelopeAttributes.getJobMonitoringStartTimeStamp(),Instant.now().toEpochMilli()));
       Job job = this.hasJobCompleted(jobId);
       /*
        * Job is in DONE State
        */
-      this.processCompletedJob(job);
+      this.updateCompletedJobMetrics(job);
       /*
        * Add Job Monitoring Stats as PubSub attributes or Update State Management Store
        */
-      messageAttributes.putIfAbsent(
-          "jobMonitoringEndTimeMs", String.valueOf(Instant.now().toEpochMilli()));
-      String jobMonitoringTotalTimeMs =
-          String.valueOf(
-              Integer.parseInt(messageAttributes.get("jobMonitoringEndTimeMs"))
-                  + Integer.parseInt(messageAttributes.get("jobMonitoringStartTimeMs")));
-      messageAttributes.putIfAbsent("jobMonitoringTotalTimeMs", jobMonitoringTotalTimeMs);
-      messageAttributes.putIfAbsent("jobCompleted", "true");
+      loaderEnvelope.loaderEnvelopeAttributes.setJobMonitoringEndTimeStamp(ObjectUtils.firstNonNull(loaderEnvelope.loaderEnvelopeAttributes.getJobMonitoringEndTimeStamp(),Instant.now().toEpochMilli()));
+      loaderEnvelope.loaderEnvelopeAttributes.setJobMonitoringTotalTimeMs(ObjectUtils.firstNonNull(loaderEnvelope.loaderEnvelopeAttributes.getJobMonitoringTotalTimeMs(), (
+          loaderEnvelope.loaderEnvelopeAttributes.getJobMonitoringEndTimeStamp())
+              + loaderEnvelope.loaderEnvelopeAttributes.getJobMonitoringStartTimeStamp()));
+      loaderEnvelope.loaderEnvelopeAttributes.setJobCompleted(true);
 
       /*
        * TODO: Update Job State, Job Statistics, Errors(if any) inside State Management Store
@@ -168,24 +175,51 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
       long jobStartTime = job.getStatistics().getStartTime();
       long jobCreatedTime = job.getStatistics().getCreationTime();
       long jobEndTime = job.getStatistics().getEndTime();
-      messageAttributes.putIfAbsent(
-          "jobAwaitingToRunLatencyMs", String.valueOf(jobStartTime - jobCreatedTime));
-      messageAttributes.putIfAbsent("jobRunLatencyMs", String.valueOf(jobEndTime - jobStartTime));
-      messageAttributes.putIfAbsent(
-          "jobTotalLatencyMs",
-          String.valueOf((jobStartTime - jobCreatedTime) + (jobEndTime - jobStartTime)));
+      loaderEnvelope.loaderEnvelopeAttributes.setJobAwaitingToRunLatencyMs(jobStartTime - jobCreatedTime);
+      loaderEnvelope.loaderEnvelopeAttributes.setJobRunLatencyMs(jobEndTime - jobStartTime);
+      loaderEnvelope.loaderEnvelopeAttributes.setJobTotalLatencyMs((jobStartTime - jobCreatedTime) + (jobEndTime - jobStartTime));
+      /*
+       * TODO: We will lose LoaderEnvelope if the job has failed. Ensure that Job Statistics are updated before
+       *  moving forward
+       */
       if (job.getStatus().getError() != null) {
         /*
-         * TODO: Job has not succeeded. Capture Error details and update state
+         * TODO: The Job has Failed. Capture Error details and update state
          *  The size of Error Message and Error Reason may be large to fit
          *  Inside PubSub Attributes
          *  For eg:
          *  messageAttributes.putIfAbsent("errorMessage", job.getStatus().getError().getMessage());
          *  messageAttributes.putIfAbsent("errorReason", job.getStatus().getError().getReason());
+         *
+         * Extract and Submit Original LoadRequest(input element) with Attributes to pushedBackForRetryAfterJobFailure TupleTag
+         * for Job Replay(Retry after Job Failure within BQ)
          */
-        messageAttributes.putIfAbsent("jobSuccessful", "false");
+        LoadRequest loadRequest = loaderEnvelope.loadRequest;
+        Integer retriesSoFar = ObjectUtils.firstNonNull(loaderEnvelope.loadRequest.loadRequestAttributes.getRetryAttemptsAfterJobFailures(), 0);
+        if (retriesSoFar < this.maxLoadRequestJobFailures) {
+          /*
+           * Check if we are within the max allowed number of RetryAttemptsAfterJobFailures
+           *  and submit the Load Request for Retry
+           */
+           loadRequest.loadRequestAttributes.setRetryAttemptsAfterJobFailures(retriesSoFar + 1);
+           List<String> previousJobIds = ObjectUtils.firstNonNull(loadRequest.loadRequestAttributes.getPreviousFailedJobIds(), new ArrayList<String>());
+           previousJobIds.add(job.getJobId().toString());
+           loadRequest.loadRequestAttributes.setPreviousFailedJobIds(previousJobIds);
+           Map<String, String> loadRequestAttributesMap = new HashMap<String, String>();
+          loadRequestAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
+           context.output(this.pushedBackForRetryAfterJobFailure, new PubsubMessage(GSON.toJson(loadRequest).getBytes(StandardCharsets.UTF_8), loadRequestAttributesMap));
+        } else {
+          /*
+           * We are beyond the maxLoadRequestJobFailures threshold. We need to send the LoadRequest to Dead Letter GCS location
+           * for Manual Inspection/Rectification
+           */
+          context.output(this.failedLoadJobRequests, GSON.toJson(loadRequest));
+        }
       } else {
-        messageAttributes.putIfAbsent("jobSuccessful", "true");
+        /*
+         * TODO: The Job has Succeeded. Extract Stats from LoadEnvelopeAttributes, and Job Status
+         *  Update State Management and we are done monitoring the Job here
+         */
       }
       /*
        * Send main output which is PCollection<Void> for Trivial Sink
@@ -199,17 +233,14 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
        * Use TupleTag with pushedBackForMonitoringJobs Tag
        * Increment Counters, Increment pushedBackForMonitoringRetries Attribute value
        */
-      messageAttributes.put(
-          "pushedBackForMonitoringRetries",
-          String.valueOf(
-              Integer.parseInt(
-                      messageAttributes.getOrDefault("pushedBackForMonitoringRetries", "1"))
-                  + 1));
       this.backOffExhaustedCount.inc();
-      this.submittedForRetryCount.inc();
+      this.submittedForMonitoringRetryCount.inc();
+      loaderEnvelope.loaderEnvelopeAttributes.setPushedBackForMonitoringRetries(ObjectUtils.firstNonNull(loaderEnvelope.loaderEnvelopeAttributes.getPushedBackForMonitoringRetries(), 0) + 1);
+      Map<String, String> loaderEnvelopeAttributesMap = new HashMap<String, String>();
+      loaderEnvelopeAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
       context.output(
           this.pushedBackForMonitoring,
-          new PubsubMessage(context.element().getPayload(), messageAttributes));
+          new PubsubMessage(GSON.toJson(loaderEnvelope).getBytes(StandardCharsets.UTF_8), loaderEnvelopeAttributesMap));
     } catch (IOException | InterruptedException e) {
       /*
        * Something bad happened during BackOff(Perhaps BackOff was interrupted)
@@ -217,17 +248,14 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
        * Use TupleTag with pushedBackForMonitoringJobs Tag
        * Increment Counters, Increment pushedBackForMonitoringRetries Attribute value
        */
-      messageAttributes.put(
-          "pushedBackForMonitoringRetries",
-          String.valueOf(
-              Integer.parseInt(
-                      messageAttributes.getOrDefault("pushedBackForMonitoringRetries", "1"))
-                  + 1));
       this.backOffInterruptedCount.inc();
-      this.submittedForRetryCount.inc();
+      this.submittedForMonitoringRetryCount.inc();
+      loaderEnvelope.loaderEnvelopeAttributes.setPushedBackForMonitoringRetries(ObjectUtils.firstNonNull(loaderEnvelope.loaderEnvelopeAttributes.getPushedBackForMonitoringRetries(), 0) + 1);
+      Map<String, String> loaderEnvelopeAttributesMap = new HashMap<String, String>();
+      loaderEnvelopeAttributesMap.put("uniqueMessageId", UUID.randomUUID().toString());
       context.output(
           this.pushedBackForMonitoring,
-          new PubsubMessage(context.element().getPayload(), messageAttributes));
+          new PubsubMessage(GSON.toJson(loaderEnvelope).getBytes(StandardCharsets.UTF_8), loaderEnvelopeAttributesMap));
     }
   }
 }
