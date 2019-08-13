@@ -32,7 +32,7 @@ public class LoadJobsMonitor {
     PCollectionTuple pCollectionTuple =
         p.apply(
                 "Consume BQ Load Jobs to be Monitored",
-                PubsubIO.readMessagesWithAttributes()
+                PubsubIO.readMessagesWithAttributes().withIdAttribute(options.getSourceDeDupId().get())
                     .fromSubscription(options.getSourceSubscription()))
             .apply(
                 "Monitor BQ Load Jobs",
@@ -47,7 +47,7 @@ public class LoadJobsMonitor {
         .get(pushedBackForMonitoring)
         .apply(
             "Push Back BQ Load Jobs for Monitoring",
-            PubsubIO.writeMessages()
+            PubsubIO.writeMessages().withIdAttribute(options.getSourceDeDupId().get())
                 .to(options.getSourceTopic().get()));
 
     /*
@@ -60,7 +60,7 @@ public class LoadJobsMonitor {
         .get(pushedBackForRetryAfterJobFailure)
         .apply(
             "Push Back BQ Load Request for Resubmission to RetryAfterJobFailureTopic post BQ Job Failure",
-            PubsubIO.writeMessages()
+            PubsubIO.writeMessages().withIdAttribute(options.getRetryAfterJobFailureDeDupId().get())
                 .to(options.getRetryAfterJobFailureTopic().get()));
     /*
      * Push Load Job Request to GCS dead letter location if we have exhausted set number of maxLoadRequestJobFailures

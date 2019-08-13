@@ -21,6 +21,19 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setSourceTopic(ValueProvider<String> value);
 
+  @Description("Source PubSub DeDup ID Attribute for Successfully Submitted Load Requests")
+
+  @Default.String("uniqueMessageId")
+  ValueProvider<String> getSourceDeDupId();
+
+  void setSourceDeDupID(ValueProvider<String> value);
+
+  @Description("Target PubSub DeDup ID Attribute for pushing the Retry of Jobs which were submitted and ended in Failed State")
+  @Default.String("uniqueMessageId")
+  ValueProvider<String> getRetryAfterJobFailureDeDupId();
+
+  void setRetryAfterJobFailureDeDupID(ValueProvider<String> value);
+
   @Description("Target PubSub Topic for pushing the Retry of Jobs which were submitted and ended in Failed State")
   @Validation.Required
   ValueProvider<String> getRetryAfterJobFailureTopic();
