@@ -221,10 +221,6 @@ public class MonitorJobDoFn extends DoFn<PubsubMessage, Void> {
          *  Update State Management and we are done monitoring the Job here
          */
       }
-      /*
-       * Send main output which is PCollection<Void> for Trivial Sink
-       */
-      context.output(null);
     } catch (BackOffExhaustedException e) {
       /*
        * Job did not transition to DONE State before BackOff expiry
