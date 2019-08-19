@@ -235,10 +235,6 @@ public class BQLoaderDoFn extends DoFn<PubsubMessage, Void> {
         context.output(
             this.submittedLoadJobs,
             new PubsubMessage(GSON.toJson(loaderEnvelope).getBytes(StandardCharsets.UTF_8), loaderEnvelopeAttributesMap));
-        /*
-         * Send main output which is PCollection<Void>
-         */
-        context.output(null);
       } catch (BigQueryException e) {
         /*
          * Something bad happened while submitting Load job to BQ
