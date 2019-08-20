@@ -45,4 +45,10 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions, Strea
   ValueProvider<Boolean> getEnableConsoleReporter();
 
   void setEnableConsoleReporter(ValueProvider<Boolean> value);
+
+  @Description("Pipeline Stage Name to be used for the Latency Metric")
+  @Validation.Required
+  ValueProvider<String> getPipelineStageName();
+
+  void setPipelineStageName(ValueProvider<String> value);
 }

@@ -30,7 +30,7 @@ public class TrivialMetricsSink extends PTransform<PCollection<Long>, PDone> {
   public PDone expand(PCollection<Long> input) {
     input.apply(
         "Perform some operations and push operational metrics via DogStatsD(UDP)",
-        ParDo.of(new SomeTimeConsumingDoFn(options)));
+        ParDo.of(new TimeConsumingDoFn(options)));
     return PDone.in(input.getPipeline());
   }
 }
