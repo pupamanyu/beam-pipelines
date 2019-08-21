@@ -126,6 +126,7 @@ public abstract class WrapDoFn<InputT, OutputT> extends DoFn<InputT, OutputT> {
      */
     try (Timer.Context timerContext = timer.time()) {
       wrap(context);
+      timerContext.stop();
     }
     /*
      * Ship Metrics to Datadog via UDP to DogStatsD Server
