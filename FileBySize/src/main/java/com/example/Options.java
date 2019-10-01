@@ -50,6 +50,18 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setAllowedLatenessMinutes(ValueProvider<Integer> value);
 
+  @Description("Expiry Timer Duration in Minutes for the Late Panes. Needs to be less than Min(Window Size, Allowed Lateness Duration)")
+  @Validation.Required
+  ValueProvider<Integer> getLatePaneExpiryTimerMinutes();
+
+  void setLatePaneExpiryTimerMinutes(ValueProvider<Integer> value);
+
+  @Description("Expiry Timer Duration in Minutes for the OnTime Panes. Needs to be less than Min(Window Size, Allowed Lateness Duration)")
+  @Validation.Required
+  ValueProvider<Integer> getOnTimePaneExpiryTimerMinutes();
+
+  void setOnTimePaneExpiryTimerMinutes(ValueProvider<Integer> value);
+
   @Description("Catalog for the Bundle to Finalize")
   @Validation.Required
   ValueProvider<String> getCatalog();

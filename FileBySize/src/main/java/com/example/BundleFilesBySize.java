@@ -18,6 +18,7 @@ import org.apache.beam.sdk.transforms.windowing.BoundedWindow;
 import org.apache.beam.sdk.transforms.windowing.PaneInfo;
 import org.apache.beam.sdk.values.KV;
 import org.joda.time.Duration;
+import org.joda.time.Instant;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
@@ -44,6 +45,8 @@ public class BundleFilesBySize extends DoFn<KV<String, String>, Bundle> {
   private int BUNDLE_ELEMENTS_THRESHOLD;
   private Duration STALENESS_MINUTES;
   private Duration LATENESS_MINUTES;
+  private Duration ON_TIME_EXPIRY_TIMER_MINUTES;
+  private Duration LATE_EXPIRY_TIMER_MINUTES;
   private ObjectMapper objectMapper;
 
 
@@ -55,6 +58,8 @@ public class BundleFilesBySize extends DoFn<KV<String, String>, Bundle> {
     STALENESS_MINUTES = Duration.standardMinutes(options.getStalenessMinutes().get());
     LATENESS_MINUTES = Duration.standardMinutes(options.getAllowedLatenessMinutes().get());
     BUNDLE_ELEMENTS_THRESHOLD = options.getBundleElementsThreshold().get();
+    ON_TIME_EXPIRY_TIMER_MINUTES = Duration.standardMinutes(options.getOnTimePaneExpiryTimerMinutes().get());
+    LATE_EXPIRY_TIMER_MINUTES = Duration.standardMinutes(options.getLatePaneExpiryTimerMinutes().get());
   }
 
   private void flush(
@@ -117,13 +122,21 @@ public class BundleFilesBySize extends DoFn<KV<String, String>, Bundle> {
       staleTimer.align(this.STALENESS_MINUTES).setRelative();
       /*
        * Set Expiry Timer so that we can flush pending Buffer when timer expires
-       * Set Expiry until LATENESS_MINUTES for the Late Pane Elements
-       * Set Expiry until Window Max TimeStamp for the Early or OnTime Pane Elements
+       * Set Expiry not beyond Window Max TimeStamp + LATENESS_MINUTES for the Late Pane Elements
+       * Set Expiry not beyond Window Max TimeStamp for the OnTime Pane Elements
        */
       if (paneInfo.getTiming().equals(PaneInfo.Timing.LATE)) {
-        expiryTimer.set(window.maxTimestamp().plus(this.LATENESS_MINUTES));
+        if (Instant.now().plus(LATE_EXPIRY_TIMER_MINUTES).isAfter(window.maxTimestamp().plus(LATENESS_MINUTES))) {
+          expiryTimer.set(window.maxTimestamp().plus(LATENESS_MINUTES));
+          } else {
+            expiryTimer.set(Instant.now().plus(LATE_EXPIRY_TIMER_MINUTES));
+        }
       } else {
-        expiryTimer.set(window.maxTimestamp());
+        if (Instant.now().plus(ON_TIME_EXPIRY_TIMER_MINUTES).isAfter(window.maxTimestamp())) {
+          expiryTimer.set(window.maxTimestamp());
+        } else {
+          expiryTimer.set(Instant.now().plus(ON_TIME_EXPIRY_TIMER_MINUTES));
+        }
       }
     }
 

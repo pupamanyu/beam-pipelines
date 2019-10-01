@@ -1,7 +1,6 @@
 package com.example;
 
 import com.google.gson.Gson;
-import com.sun.xml.internal.bind.v2.TODO;
 import org.apache.avro.reflect.Nullable;
 import org.apache.commons.lang3.StringUtils;
 
