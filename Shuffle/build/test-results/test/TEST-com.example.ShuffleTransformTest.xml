@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<testsuite name="com.example.ShuffleTransformTest" tests="3" skipped="0" failures="0" errors="0" timestamp="2019-12-19T02:23:13" hostname="pramodrao-macbookpro.roam.corp.google.com" time="1.992">
+  <properties/>
+  <testcase name="testShuffleTransformInteger" classname="com.example.ShuffleTransformTest" time="1.673"/>
+  <testcase name="testShuffleTransformEmpty" classname="com.example.ShuffleTransformTest" time="0.14"/>
+  <testcase name="testShuffleTransformString" classname="com.example.ShuffleTransformTest" time="0.176"/>
+  <system-out><![CDATA[]]></system-out>
+  <system-err><![CDATA[log4j:WARN No appenders could be found for logger (org.apache.beam.sdk.Pipeline).
+log4j:WARN Please initialize the log4j system properly.
+log4j:WARN See http://logging.apache.org/log4j/1.2/faq.html#noconfig for more info.
+]]></system-err>
+</testsuite>
