@@ -1,5 +1,22 @@
 # perf-data-loader
 
+#### Sample Input Data to the pipeline
+- Input Metric JSON(catchpoint)
+```yaml
+{
+  "TestName": "WWW-Test-GCP-asia-south1-standard-IP",
+  "TestURL": "xx.xx.xx.xx/testpage.html",
+  "TimeStamp":"20200107233410117",
+  "NodeName":"Los Angeles - Level3",
+  "DNSTime":"0",
+  "Connect": "248",
+  "SSL": "0",
+  "SendTime": "0",
+  "WaitTime": "248",
+  "Total":"496"
+}
+```
+
 #### BigQuery Schema for the tables needed by the pipeline
 - Main Table 
 ```yaml
