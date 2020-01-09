@@ -1,6 +1,6 @@
 # perf-data-loader
 
-# BigQuery Schema for the tables needed by the pipeline
+#### BigQuery Schema for the tables needed by the pipeline
 - Main Table 
 ```yaml
 {
