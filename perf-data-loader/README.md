@@ -104,7 +104,7 @@ $ ./gradlew clean && ./gradlew shadowJar
 - To run the pipeline, execute the below command from within the project root directory
 
 ```bash
-$ cd ../libs && java -jar perf-data-loader-1.0.jar  \
+$ cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --dataSet=<Target DataSet>  \
      --table=<Target Table> \
      --deadLetterDataSet=<Dead Letter DataSet> \
@@ -118,7 +118,7 @@ $ cd ../libs && java -jar perf-data-loader-1.0.jar  \
 - To update an existing compatible pipeline, execute the below command from within the project root directory
 
 ```bash
-$ cd ../libs && java -jar perf-data-loader-1.0.jar  \
+$ cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --dataSet=<Target DataSet>  \
      --table=<Target Table> \
      --deadLetterDataSet=<Dead Letter DataSet> \
