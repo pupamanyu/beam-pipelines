@@ -98,13 +98,13 @@
 
 -  To Build the Fat Jar, execute the below command from within the project root directory
 ```bash
-$ ./gradlew clean && ./gradlew shadowJar
+$ (./gradlew clean && ./gradlew shadowJar ;)
 ```
 
 - To run the pipeline, execute the below command from within the project root directory
 
 ```bash
-$ cd build/libs && java -jar perf-data-loader-1.0.jar  \
+$ (cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --dataSet=<Target DataSet>  \
      --table=<Target Table> \
      --deadLetterDataSet=<Dead Letter DataSet> \
@@ -112,13 +112,13 @@ $ cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --runner=DataflowRunner \
      --project=<GCP Project Name>\
      --subscription=projects/<GCP Project Name>/subscriptions/<PubSub Subscription> \
-     --jobName=<Pipeline Job Name>
+     --jobName=<Pipeline Job Name> ;)
 ```
 
 - To update an existing compatible pipeline, execute the below command from within the project root directory
 
 ```bash
-$ cd build/libs && java -jar perf-data-loader-1.0.jar  \
+$ (cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --dataSet=<Target DataSet>  \
      --table=<Target Table> \
      --deadLetterDataSet=<Dead Letter DataSet> \
@@ -127,5 +127,5 @@ $ cd build/libs && java -jar perf-data-loader-1.0.jar  \
      --project=<GCP Project Name>\
      --subscription=projects/<GCP Project Name>/subscriptions/<PubSub Subscription> \
      --jobName=<Existing Pipeline Job Name> \
-     --update
+     --update ;)
 ```
