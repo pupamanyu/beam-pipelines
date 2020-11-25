@@ -66,6 +66,24 @@ public abstract class Metric {
   @JsonProperty("Total")
   public abstract BigDecimal Total();
 
+  @JsonProperty("PacketLoss")
+  public abstract BigDecimal PacketLoss();
+
+  @JsonProperty("RTTAvg")
+  public abstract BigDecimal RTTAvg();
+
+  @JsonProperty("nodeDetails")
+  public abstract String nodeDetails();
+
+  @JsonProperty("TraceRouteAddress")
+  public abstract String TraceRouteAddress();
+
+  @JsonProperty("pingRTT")
+  public abstract BigDecimal pingRTT();
+
+  @JsonProperty("ErrorCode")
+  public abstract String ErrorCode();
+
   @AutoValue.Builder
   public interface Builder {
     @JsonProperty("TestName")
@@ -98,6 +116,24 @@ public abstract class Metric {
 
     @JsonProperty("Total")
     Builder Total(BigDecimal Total);
+
+    @JsonProperty("PacketLoss")
+    Builder PacketLoss(BigDecimal PacketLoss);
+
+    @JsonProperty("RTTAvg")
+    Builder RTTAvg(BigDecimal RTTAvg);
+
+    @JsonProperty("nodeDetails")
+    Builder nodeDetails(String nodeDetails);
+
+    @JsonProperty("TraceRouteAddress")
+    Builder TraceRouteAddress(String TraceRouteAddress);
+
+    @JsonProperty("pingRTT")
+    Builder pingRTT(BigDecimal pingRTT);
+
+    @JsonProperty("ErrorCode")
+    Builder ErrorCode(String ErrorCode);
 
     Metric build();
   }
