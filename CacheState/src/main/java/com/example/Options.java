@@ -23,13 +23,17 @@ import org.apache.beam.sdk.options.ValueProvider;
 
 public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
-  @Description("BigTable Instance ID") @Validation.Required ValueProvider<String> getBigTableInstance();
+  @Description("BigTable Instance ID") @Validation.Required ValueProvider<String> getTableInstance();
 
-  void setBigTableInstance(ValueProvider<String> value);
+  void setTableInstance(ValueProvider<String> value);
 
-  @Description("BigTable Table Name") @Validation.Required ValueProvider<String> getBigTableName();
+  @Description("BigTable Table Name") @Validation.Required ValueProvider<String> getTableName();
 
-  void setBigTableName(ValueProvider<String> value);
+  void setTableName(ValueProvider<String> value);
+
+  @Description("BigTable Column Family") @Validation.Required ValueProvider<String> getColumnFamily();
+
+  void setColumnFamily(ValueProvider<String> value);
 
   @Description("GCS Bucket Name(For eg: gs://<bucket name>") @Validation.Required ValueProvider<String> getGcsBucket();
 

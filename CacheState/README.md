@@ -10,11 +10,12 @@ $ (./gradlew clean && ./gradlew shadowJar ;)
 ```bash
 $ (cd build/libs && java -jar CacheState-1.0.jar \
      --region=<GCP region name> \
-     --bigTableInstance=<bigtable instance name> \ 
-     --bigTableName=<bigtable table name> \
-     --gcsBucket=<gs://bucket> \ 
-     --fileNamePrefix=<gcs filename prefix> \
-     --numberOfShards=<number of shards for the sink files on GCS> \
+     --tableInstance=<BigTable Instance Name> \ 
+     --tableName=<BigTable Table Name> \
+     --columnFamily=<BigTable Column Family> \
+     --gcsBucket=<gs://BucketName> \ 
+     --fileNamePrefix=<GCS Filename Prefix> \
+     --numberOfShards=<Number of Shards for the Sink Files on GCS> \
      --runner=DataflowRunner \
      --jobName=cachestate ;)
 ```
@@ -24,11 +25,12 @@ $ (cd build/libs && java -jar CacheState-1.0.jar \
 ```bash
 $ (cd build/libs && java -jar CacheState-1.0.jar \
      --region=<GCP region name> \
-     --bigTableInstance=<bigtable instance name> \ 
-     --bigTableName=<bigtable table name> \
-     --gcsBucket=<gs://bucket> \ 
-     --fileNamePrefix=<gcs filename prefix> \
-     --numberOfShards=<number of shards for the sink files on GCS> \
+     --tableInstance=<BigTable Instance Name> \ 
+     --tableName=<BigTable Table Name> \
+     --columnFamily=<BigTable Column Family> \
+     --gcsBucket=<gs://BucketName> \ 
+     --fileNamePrefix=<GCS Filename Prefix> \
+     --numberOfShards=<Number of Shards for the Sink Files on GCS> \
      --runner=DataflowRunner \
      --jobName=cachestate \ 
      --update ;)

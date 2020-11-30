@@ -42,31 +42,32 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
 
   private static final Logger LOG = LoggerFactory.getLogger(CacheStateDoFn.class);
   private final String projectID;
-  private final String bigTableInstance;
-  private final String bigTableName;
-  private final String COLUMN_FAMILY_NAME = "cf1";
-  private BigtableDataClient bigtableDataClient;
+  private final String tableInstance;
+  private final String tableName;
+  private final String columnFamily;
+  private BigtableDataClient stateDBClient;
   private ObjectMapper mapper;
   private LoadingCache<String, String> states;
 
-  public CacheStateDoFn(String projectID, String bigTableInstance, String bigTableName) {
+  public CacheStateDoFn(String projectID, String tableInstance, String tableName, String columnFamily) {
     this.projectID = projectID;
-    this.bigTableInstance = bigTableInstance;
-    this.bigTableName = bigTableName;
+    this.tableInstance = tableInstance;
+    this.tableName = tableName;
+    this.columnFamily = columnFamily;
   }
 
   private void updateState(String key, String value) {
-    assert bigtableDataClient != null;
-    RowMutation rowMutation = RowMutation.create(bigTableName, key)
-        .setCell(COLUMN_FAMILY_NAME, ByteString.copyFromUtf8(key),
+    assert stateDBClient != null;
+    RowMutation rowMutation = RowMutation.create(tableName, key)
+        .setCell(columnFamily, ByteString.copyFromUtf8(key),
             System.currentTimeMillis() * 1000, ByteString.copyFromUtf8(value));
     LOG.info("Updated State for {} with {}", key, value);
-    bigtableDataClient.mutateRow(rowMutation);
+    stateDBClient.mutateRow(rowMutation);
   }
 
   private String getState(String key) {
-    assert bigtableDataClient != null;
-    Row row = bigtableDataClient.readRow(bigTableName, key);
+    assert stateDBClient != null;
+    Row row = stateDBClient.readRow(tableName, key);
     StringBuilder value = new StringBuilder();
     for (RowCell rowCell : row.getCells()) {
       assert rowCell.getValue().toStringUtf8() != null;
@@ -76,8 +77,8 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
   }
 
   private void deleteState(String key) {
-    RowMutation rowMutation = RowMutation.create(bigTableName, key).deleteRow();
-    bigtableDataClient.mutateRow(rowMutation);
+    RowMutation rowMutation = RowMutation.create(tableName, key).deleteRow();
+    stateDBClient.mutateRow(rowMutation);
   }
 
   private String stateToJson(State state) {
@@ -92,15 +93,15 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
 
   @StartBundle public void startBundle(StartBundleContext startBundleContext) {
     assert states != null;
-    assert bigtableDataClient != null;
+    assert stateDBClient != null;
   }
 
   @Setup public void doSetup() throws IOException {
     mapper = JsonMapper.builder().build();
     mapper.setTimeZone(TimeZone.getTimeZone("UTC"));
-    bigtableDataClient = BigtableDataClient.create(
+    stateDBClient = BigtableDataClient.create(
         BigtableDataSettings.newBuilder().setProjectId(this.projectID)
-            .setInstanceId(this.bigTableInstance).build());
+            .setInstanceId(this.tableInstance).build());
 
     //Cache used BigTable as a backend state
     states = Caffeine.newBuilder().maximumSize(10_000) // Maximum Size of Cache is 10000 rows
@@ -121,7 +122,7 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
             }
           }
         }).build(this::getState);
-    assert bigtableDataClient != null;
+    assert stateDBClient != null;
   }
 
   @ProcessElement public void processElement(ProcessContext context) {
@@ -131,12 +132,12 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
     /* Get the state based on the Key derived from input element.
      * Can be derived using more with metadata as well(for eg: Range of keys)
      */
-    RowMutation rowMutation = RowMutation.create(bigTableName, context.element().getKey())
-        .setCell(COLUMN_FAMILY_NAME, ByteString.copyFromUtf8(context.element().getKey()),
+    RowMutation rowMutation = RowMutation.create(tableName, context.element().getKey())
+        .setCell(columnFamily, ByteString.copyFromUtf8(context.element().getKey()),
             System.currentTimeMillis() * 1000,
             ByteString.copyFromUtf8(RandomStringUtils.randomAlphabetic(1)));
 
-    assert bigtableDataClient != null;
+    assert stateDBClient != null;
     assert states != null;
 
     // Create/Update State
@@ -162,6 +163,6 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
   }
 
   @Teardown public void doTearDown() {
-    bigtableDataClient.close();
+    stateDBClient.close();
   }
 }

@@ -40,8 +40,8 @@ public class CacheState {
                 .plusDelayOf(Duration.standardSeconds(60L)))).withAllowedLateness(Duration.ZERO)
             .discardingFiredPanes()).apply("Add Random Keys", ParDo.of(new ReKeyDoFn()))
         .apply("Prototype DoFn for Caching State Externally", ParDo
-            .of(new CacheStateDoFn(options.getProject(), options.getBigTableInstance().get(),
-                options.getBigTableName().get()))).apply("Write to GCS Sink",
+            .of(new CacheStateDoFn(options.getProject(), options.getTableInstance().get(),
+                options.getTableName().get(), options.getColumnFamily().get()))).apply("Write to GCS Sink",
         TextIO.write().to(FilePrefix).withWindowedWrites()
             .withNumShards(options.getNumberOfShards().get()));
     ;
