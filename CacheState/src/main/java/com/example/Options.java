@@ -31,9 +31,9 @@ public interface Options extends PipelineOptions, DataflowPipelineOptions {
 
   void setBigTableName(ValueProvider<String> value);
 
-  @Description("GCS Bucket Name(For eg: gs://<bucket name>") @Validation.Required ValueProvider<String> getGCSBucket();
+  @Description("GCS Bucket Name(For eg: gs://<bucket name>") @Validation.Required ValueProvider<String> getGcsBucket();
 
-  void setGCSBucket(ValueProvider<String> value);
+  void setGcsBucket(ValueProvider<String> value);
 
   @Description("Output File Name Prefix") @Validation.Required ValueProvider<String> getFileNamePrefix();
 

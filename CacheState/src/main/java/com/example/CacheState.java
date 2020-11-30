@@ -31,7 +31,7 @@ public class CacheState {
   public static void main(String[] args) {
     // Set Options from command line arguments
     Options options = PipelineOptionsFactory.fromArgs(args).withValidation().as(Options.class);
-    String FilePrefix = options.getGCSBucket().get() + "/" + options.getFileNamePrefix().get();
+    String FilePrefix = options.getGcsBucket().get() + "/" + options.getFileNamePrefix().get();
     // Initialize Pipeline
     Pipeline p = Pipeline.create(options);
     p.apply(GenerateSequence.from(0).withRate(1L, Duration.millis(1L))).apply(
