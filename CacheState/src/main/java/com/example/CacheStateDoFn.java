@@ -49,7 +49,8 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
   private ObjectMapper mapper;
   private LoadingCache<String, String> states;
 
-  public CacheStateDoFn(String projectID, String tableInstance, String tableName, String columnFamily) {
+  public CacheStateDoFn(String projectID, String tableInstance, String tableName,
+      String columnFamily) {
     this.projectID = projectID;
     this.tableInstance = tableInstance;
     this.tableName = tableName;
@@ -59,8 +60,8 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
   private void updateState(String key, String value) {
     assert stateDBClient != null;
     RowMutation rowMutation = RowMutation.create(tableName, key)
-        .setCell(columnFamily, ByteString.copyFromUtf8(key),
-            System.currentTimeMillis() * 1000, ByteString.copyFromUtf8(value));
+        .setCell(columnFamily, ByteString.copyFromUtf8(key), System.currentTimeMillis() * 1000,
+            ByteString.copyFromUtf8(value));
     LOG.info("Updated State for {} with {}", key, value);
     stateDBClient.mutateRow(rowMutation);
   }
@@ -126,43 +127,41 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
   }
 
   @ProcessElement public void processElement(ProcessContext context) {
-    /* Update State for the key derived from the input element.
-     * Key can be derived fro metadata as well(for eg: Range of keys)
-     */
-    /* Get the state based on the Key derived from input element.
-     * Can be derived using more with metadata as well(for eg: Range of keys)
-     */
-    RowMutation rowMutation = RowMutation.create(tableName, context.element().getKey())
-        .setCell(columnFamily, ByteString.copyFromUtf8(context.element().getKey()),
-            System.currentTimeMillis() * 1000,
-            ByteString.copyFromUtf8(RandomStringUtils.randomAlphabetic(1)));
-
     assert stateDBClient != null;
     assert states != null;
 
-    // Create/Update State
+    /* Update State for the key derived from the input element.
+     * Key can be derived from the metadata as well(for eg: Range of keys)
+     */
     State state = State.newBuilder().Key(context.element().getKey())
         .Field1(RandomStringUtils.randomAlphabetic(5)).Field2(RandomStringUtils.randomAlphabetic(5))
         .build();
-    // Check if the state for the key exists already
+
+    /* Get the state based on the Key derived from input element.
+     * Can be derived using more with metadata as well(for eg: Range of keys)
+     * We can also use .get() and a mapper function to set state atomically
+     * instead of getIfPresent() below
+     */
     String cachedValue = states.getIfPresent(context.element().getKey());
-    // We can also use .get() and a mapper function to set state atomically instead of getIfPresent() below
     LOG.info("Cached Value for {} is {}", context.element().getKey(),
         states.getIfPresent(context.element().getKey()));
+
     // Update State if state for the key does not exist
     if (cachedValue == null) {
       states.put(context.element().getKey(), stateToJson(state));
       LOG.info("Cached Value for {} did not exist, and is now set to {}",
           context.element().getKey(), states.getIfPresent(context.element().getKey()));
     }
+    // Output of DoFn to the next stage
     context.output(states.getIfPresent(context.element().getKey()));
   }
 
   @FinishBundle public void finishBundle(FinishBundleContext finishBundleContext) {
-
+    // Can be used for the clean up tasks after Bundle is processed
   }
 
   @Teardown public void doTearDown() {
+    // Tear Down the State DB Client when worker is being terminated
     stateDBClient.close();
   }
 }
