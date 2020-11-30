@@ -104,7 +104,7 @@ public class CacheStateDoFn extends DoFn<KV<String, Long>, String> {
         BigtableDataSettings.newBuilder().setProjectId(this.projectID)
             .setInstanceId(this.tableInstance).build());
 
-    //Cache used BigTable as a backend state
+    // Caffeine Cache is configured to use BigTable as a backend DB
     states = Caffeine.newBuilder().maximumSize(10_000) // Maximum Size of Cache is 10000 rows
         .refreshAfterWrite(Duration.ofMinutes(
             1L)) // Return old value after expiry while cache is getting refreshed after expiry
