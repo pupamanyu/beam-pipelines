@@ -1,3 +1,5 @@
+#### Pipeline Flow
+![Pipeline Flow](../../assets/cache_state_externally.png?raw=true)
 #### Pipeline Build/Execution Steps
 
 -  To Build the Fat Jar, execute the below command from within the project root directory
